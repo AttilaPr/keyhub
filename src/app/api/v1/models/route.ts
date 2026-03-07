@@ -1,0 +1,50 @@
+import { NextResponse } from 'next/server'
+import { verifyPlatformKey } from '@/lib/platform-key'
+import { PROVIDER_MODELS } from '@/lib/providers'
+import prisma from '@/lib/prisma'
+
+export async function GET(req: Request) {
+  const authHeader = req.headers.get('Authorization')
+  const rawKey = authHeader?.replace('Bearer ', '')
+  if (!rawKey) {
+    return NextResponse.json({ error: 'Missing API key' }, { status: 401 })
+  }
+
+  const prefix = rawKey.slice(0, 16)
+  const platformKeys = await prisma.platformKey.findMany({
+    where: { keyPrefix: { startsWith: prefix.slice(0, 12) }, isActive: true },
+  })
+
+  let platformKey = null
+  for (const pk of platformKeys) {
+    if (await verifyPlatformKey(rawKey, pk.keyHash)) {
+      platformKey = pk
+      break
+    }
+  }
+
+  if (!platformKey) {
+    return NextResponse.json({ error: 'Invalid API key' }, { status: 401 })
+  }
+
+  const providerKeys = await prisma.providerKey.findMany({
+    where: { userId: platformKey.userId, isActive: true },
+    select: { provider: true },
+  })
+
+  const activeProviders = providerKeys.map((k) => k.provider)
+  const models: { id: string; object: string; owned_by: string }[] = []
+
+  for (const provider of activeProviders) {
+    const providerModels = PROVIDER_MODELS[provider] || []
+    for (const modelId of providerModels) {
+      models.push({
+        id: `${provider}/${modelId}`,
+        object: 'model',
+        owned_by: provider,
+      })
+    }
+  }
+
+  return NextResponse.json({ object: 'list', data: models })
+}

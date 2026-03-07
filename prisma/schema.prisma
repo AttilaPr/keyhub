@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+
+  providerKeys ProviderKey[]
+  platformKeys PlatformKey[]
+  logs         RequestLog[]
+  usageSummary UsageSummary[]
+}
+
+model ProviderKey {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String
+  label        String
+  encryptedKey String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs RequestLog[]
+
+  @@unique([userId, provider])
+}
+
+model PlatformKey {
+  id         String    @id @default(cuid())
+  userId     String
+  label      String
+  keyHash    String    @unique
+  keyPrefix  String
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs RequestLog[]
+}
+
+model RequestLog {
+  id               String   @id @default(cuid())
+  userId           String
+  platformKeyId    String
+  providerKeyId    String
+  provider         String
+  model            String
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  costUsd          Float    @default(0)
+  status           String
+  errorMessage     String?
+  latencyMs        Int      @default(0)
+  prompt           String   @db.Text
+  response         String?  @db.Text
+  createdAt        DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id])
+  platformKey PlatformKey @relation(fields: [platformKeyId], references: [id])
+  providerKey ProviderKey @relation(fields: [providerKeyId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, provider])
+  @@index([userId, status])
+}
+
+model UsageSummary {
+  id        String   @id @default(cuid())
+  userId    String
+  provider  String
+  model     String
+  date      DateTime @db.Date
+  requests  Int      @default(0)
+  tokens    Int      @default(0)
+  costUsd   Float    @default(0)
+  failedReqs Int     @default(0)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, provider, model, date])
+  @@index([userId, date])
+}
