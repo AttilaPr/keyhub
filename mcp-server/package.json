@@ -1,0 +1,22 @@
+{
+  "name": "@keyhub/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for KeyHub AI API Gateway — chat completions, usage monitoring, and log viewing",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "keyhub-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

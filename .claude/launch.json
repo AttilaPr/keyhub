@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "/Users/attila/.nvm/versions/node/v20.19.5/bin/node",
+      "runtimeArgs": ["node_modules/.bin/next", "dev"],
+      "port": 4200,
+      "autoPort": true,
+      "env": {
+        "PATH": "/Users/attila/.nvm/versions/node/v20.19.5/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  ]
+}

@@ -2,50 +2,91 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
 import { encryptKey, decryptKey } from '@/lib/encryption'
+import { checkPlanLimit } from '@/lib/plan-limits'
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const keys = await prisma.providerKey.findMany({
-    where: { userId: session.user.id },
-    select: {
-      id: true,
-      provider: true,
-      label: true,
-      isActive: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+  const { searchParams } = new URL(req.url)
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50))
+  const skip = (page - 1) * limit
 
-  return NextResponse.json(keys)
+  const where = { userId: session.user.id }
+
+  const [keys, total] = await Promise.all([
+    prisma.providerKey.findMany({
+      where,
+      select: {
+        id: true,
+        provider: true,
+        label: true,
+        isActive: true,
+        weight: true,
+        latencyEma: true,
+        rotationReminderDays: true,
+        lastRotatedAt: true,
+        createdAt: true,
+        _count: { select: { logs: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.providerKey.count({ where }),
+  ])
+
+  // Aggregate cost and last used per provider key
+  const keyIds = keys.map((k) => k.id)
+  const [costAggs, lastUsedAggs] = keyIds.length > 0
+    ? await Promise.all([
+        prisma.requestLog.groupBy({
+          by: ['providerKeyId'],
+          where: { providerKeyId: { in: keyIds } },
+          _sum: { costUsd: true },
+        }),
+        prisma.requestLog.groupBy({
+          by: ['providerKeyId'],
+          where: { providerKeyId: { in: keyIds } },
+          _max: { createdAt: true },
+        }),
+      ])
+    : [[], []]
+
+  const costMap = new Map(costAggs.map((a) => [a.providerKeyId, a._sum.costUsd || 0]))
+  const lastUsedMap = new Map(lastUsedAggs.map((a) => [a.providerKeyId, a._max.createdAt]))
+
+  const result = keys.map((k) => ({
+    ...k,
+    totalCost: costMap.get(k.id) || 0,
+    lastUsedAt: lastUsedMap.get(k.id) || null,
+  }))
+
+  return NextResponse.json({ keys: result, total, page, limit })
 }
 
 export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { provider, label, apiKey } = await req.json()
+  const { provider, label, apiKey, weight } = await req.json()
 
   if (!provider || !label || !apiKey) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const existing = await prisma.providerKey.findUnique({
-    where: { userId_provider: { userId: session.user.id, provider } },
-  })
+  const parsedWeight = weight ? Math.min(10, Math.max(1, parseInt(weight, 10) || 1)) : 1
 
-  if (existing) {
-    const updated = await prisma.providerKey.update({
-      where: { id: existing.id },
-      data: {
-        label,
-        encryptedKey: encryptKey(apiKey),
-        isActive: true,
+  // Check plan limit for new keys
+  const planCheck = await checkPlanLimit(session.user.id, 'providerKeys')
+  if (!planCheck.allowed) {
+    return NextResponse.json(
+      {
+        error: `Plan limit reached: you have ${planCheck.current}/${planCheck.limit} provider keys. Upgrade your plan to create more.`,
       },
-    })
-    return NextResponse.json({ id: updated.id, provider, label })
+      { status: 403 }
+    )
   }
 
   const key = await prisma.providerKey.create({
@@ -54,10 +95,12 @@ export async function POST(req: Request) {
       provider,
       label,
       encryptedKey: encryptKey(apiKey),
+      lastRotatedAt: new Date(),
+      weight: parsedWeight,
     },
   })
 
-  return NextResponse.json({ id: key.id, provider, label }, { status: 201 })
+  return NextResponse.json({ id: key.id, provider, label, weight: key.weight }, { status: 201 })
 }
 
 export async function DELETE(req: Request) {
@@ -79,12 +122,29 @@ export async function PATCH(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id, isActive } = await req.json()
+  const { id, isActive, rotationReminderDays, weight } = await req.json()
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
-  const key = await prisma.providerKey.updateMany({
+  const data: Record<string, unknown> = {}
+  if (typeof isActive === 'boolean') data.isActive = isActive
+  if (rotationReminderDays !== undefined) {
+    const parsed = rotationReminderDays === null ? null : parseInt(rotationReminderDays, 10)
+    if (parsed !== null && (isNaN(parsed) || parsed < 1)) {
+      return NextResponse.json({ error: 'Rotation reminder days must be at least 1' }, { status: 400 })
+    }
+    data.rotationReminderDays = parsed
+  }
+  if (weight !== undefined) {
+    const parsed = parseInt(weight, 10)
+    if (isNaN(parsed) || parsed < 1 || parsed > 10) {
+      return NextResponse.json({ error: 'Weight must be between 1 and 10' }, { status: 400 })
+    }
+    data.weight = parsed
+  }
+
+  await prisma.providerKey.updateMany({
     where: { id, userId: session.user.id },
-    data: { isActive },
+    data,
   })
 
   return NextResponse.json({ success: true })

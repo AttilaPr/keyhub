@@ -46,7 +46,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               toast.variant === 'destructive'
                 ? 'border-red-800 bg-red-950 text-red-100'
                 : toast.variant === 'success'
-                ? 'border-emerald-800 bg-emerald-950 text-emerald-100'
+                ? 'border-lime-800 bg-lime-950 text-lime-100'
                 : 'border-zinc-800 bg-zinc-950 text-zinc-100'
             )}
           >

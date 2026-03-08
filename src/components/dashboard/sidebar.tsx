@@ -29,10 +29,10 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-zinc-800 bg-zinc-950">
-      <div className="flex h-16 items-center gap-2 border-b border-zinc-800 px-6">
-        <Zap className="h-6 w-6 text-blue-500" />
-        <span className="text-lg font-bold text-white">KeyHub</span>
+    <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-background">
+      <div className="flex h-16 items-center gap-2 border-b border-border px-6">
+        <Zap className="h-6 w-6 text-primary" />
+        <span className="text-lg font-bold text-foreground">KeyHub</span>
       </div>
 
       <nav className="flex-1 space-y-1 p-4">
@@ -45,8 +45,8 @@ export function Sidebar() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
                 isActive
-                  ? 'bg-blue-600/10 text-blue-500'
-                  : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
               )}
             >
               <item.icon className="h-4 w-4" />
@@ -56,11 +56,11 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-zinc-800 p-4">
+      <div className="border-t border-border p-4">
         <form action="/api/auth/signout" method="POST">
           <button
             type="submit"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800/50 hover:text-zinc-100 cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground cursor-pointer"
           >
             <LogOut className="h-4 w-4" />
             Sign Out

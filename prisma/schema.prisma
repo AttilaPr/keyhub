@@ -7,17 +7,76 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime @default(now())
+enum Role {
+  USER
+  SUPER_ADMIN
+}
 
-  providerKeys ProviderKey[]
-  platformKeys PlatformKey[]
-  logs         RequestLog[]
-  usageSummary UsageSummary[]
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum BudgetPeriod {
+  daily
+  weekly
+  monthly
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  name            String?
+  role            Role     @default(USER)
+  monthlyBudgetUsd Float?
+  budgetAlertThreshold Float @default(0.8)
+  budgetHardCap   Boolean  @default(false)
+  totpSecret      String?
+  totpEnabled     Boolean  @default(false)
+  totpFailedAttempts Int   @default(0)
+  totpLockedUntil DateTime?
+  suspended       Boolean  @default(false)
+  suspendedAt     DateTime?
+  suspendReason   String?
+  sessionInvalidatedAt DateTime?
+  createdAt       DateTime @default(now())
+
+  providerKeys     ProviderKey[]
+  platformKeys     PlatformKey[]
+  logs             RequestLog[]
+  usageSummary     UsageSummary[]
+  anomalyEvents    AnomalyEvent[]
+  promptTemplates  PromptTemplate[]
+  webhookEndpoints WebhookEndpoint[]
+  orgMemberships   OrganizationMember[]
+  announcementsCreated    Announcement[]            @relation("AnnouncementCreator")
+  announcementDismissals  AnnouncementDismissal[]   @relation("AnnouncementDismissals")
+  totpBackupCodes  TotpBackupCode[]
+
+  lastBudgetAlertSentAt DateTime?
+
+  // Email notification preferences
+  emailBudgetAlerts   Boolean @default(true)
+  emailAnomalyAlerts  Boolean @default(true)
+  emailKeyRotation    Boolean @default(true)
+  emailKeyExpiry      Boolean @default(true)
+
+  // Anomaly detection settings
+  anomalyDetectionEnabled Boolean @default(true)
+  anomalyThresholdSigma   Float   @default(3.0)
+  anomalyNotifyEmail      Boolean @default(true)
+  anomalyNotifyWebhook    Boolean @default(true)
+
+  // Finance
+  pricingMultiplier Float @default(1.0)
+
+  // Plan
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id])
+
+  creditTransactions CreditTransaction[]
 }
 
 model ProviderKey {
@@ -29,28 +88,70 @@ model ProviderKey {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  rotationReminderDays Int?       // Remind to rotate every N days (null = disabled)
+  lastRotatedAt        DateTime?  // Updated on each key upsert
+
+  weight       Int      @default(1)       // Weight for load balancing (1-10)
+  latencyEma   Float?                    // Exponential moving average latency in ms
+
+  orgId        String?
+  organization Organization? @relation(fields: [orgId], references: [id])
+
   user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   logs RequestLog[]
 
-  @@unique([userId, provider])
+  @@index([userId, provider])
+  @@index([orgId])
 }
 
 model PlatformKey {
-  id         String    @id @default(cuid())
-  userId     String
-  label      String
-  keyHash    String    @unique
-  keyPrefix  String
-  isActive   Boolean   @default(true)
-  lastUsedAt DateTime?
-  createdAt  DateTime  @default(now())
+  id               String        @id @default(cuid())
+  userId           String
+  label            String
+  keyHash          String        @unique
+  keyPrefix        String
+  isActive         Boolean       @default(true)
+  revokedAt        DateTime?     // Set when key is revoked by admin; returns 401 on all future requests
+  rateLimit        Int?          // Max requests per minute (null = unlimited)
+  expiresAt        DateTime?     // Optional expiration date (null = never expires)
+  budgetUsd        Float?        // Budget limit for this key (null = unlimited)
+  budgetPeriod     BudgetPeriod  @default(monthly)
+  allowedProviders String[]      // Empty = all providers allowed
+  allowedModels    String[]      // Empty = all models allowed
+  maxCostPerRequest Float?       // Max cost per single request (null = unlimited)
+  ipAllowlist      String[]      // Empty = all IPs allowed; supports CIDR
+  maxRetries       Int?          // Per-key retry override (null = use default)
+  routingStrategy  String        @default("round-robin") // round-robin, least-latency, random
+  lastUsedAt       DateTime?
+  createdAt        DateTime      @default(now())
 
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  logs RequestLog[]
+  orgId            String?
+  organization     Organization? @relation(fields: [orgId], references: [id])
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs          RequestLog[]
+  fallbackRules FallbackRule[]
+
+  @@index([orgId])
+}
+
+model FallbackRule {
+  id               String   @id @default(cuid())
+  platformKeyId    String
+  primaryProvider  String
+  fallbackProvider String
+  triggerOnStatus  Int[]
+  priority         Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  platformKey PlatformKey @relation(fields: [platformKeyId], references: [id], onDelete: Cascade)
+
+  @@index([platformKeyId])
 }
 
 model RequestLog {
   id               String   @id @default(cuid())
+  requestId        String?  // Unique request ID for tracing (X-Request-ID header)
   userId           String
   platformKeyId    String
   providerKeyId    String
@@ -61,11 +162,19 @@ model RequestLog {
   totalTokens      Int      @default(0)
   costUsd          Float    @default(0)
   status           String
+  retryCount       Int      @default(0)
+  fallbackUsed     Boolean  @default(false)
+  originalProvider String?
+  fallbackProvider String?
   errorMessage     String?
   latencyMs        Int      @default(0)
+  tag              String?
   prompt           String   @db.Text
   response         String?  @db.Text
   createdAt        DateTime @default(now())
+
+  orgId        String?
+  organization Organization? @relation(fields: [orgId], references: [id])
 
   user        User        @relation(fields: [userId], references: [id])
   platformKey PlatformKey @relation(fields: [platformKeyId], references: [id])
@@ -74,6 +183,86 @@ model RequestLog {
   @@index([userId, createdAt])
   @@index([userId, provider])
   @@index([userId, status])
+  @@index([userId, tag])
+  @@index([orgId])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  actorId    String
+  action     String   // user.login, provider_key.created, etc.
+  targetType String?  // User, ProviderKey, PlatformKey, etc.
+  targetId   String?
+  metadata   String?  @db.Text // JSON
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action])
+  @@index([userId, createdAt])
+}
+
+model AnomalyEvent {
+  id             String    @id @default(cuid())
+  userId         String
+  type           String    // request_volume, cost_spike, error_rate, key_dominance
+  severity       String    // warning, critical
+  description    String
+  detectedAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, detectedAt])
+}
+
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String
+  secret    String
+  events    String[] // budget.threshold, budget.exhausted, key.expired, etc.
+  active    Boolean  @default(true)
+  failures  Int      @default(0) // consecutive failures
+  createdAt DateTime @default(now())
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+}
+
+model WebhookDelivery {
+  id           String    @id @default(cuid())
+  endpointId   String
+  event        String
+  payload      String    @db.Text
+  statusCode   Int?
+  responseBody String?   @db.Text
+  attemptCount Int       @default(1)
+  deliveredAt  DateTime?
+  failedAt     DateTime?
+  createdAt    DateTime  @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, createdAt])
+}
+
+model PromptTemplate {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  description  String?
+  systemPrompt String   @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model UsageSummary {
@@ -91,4 +280,142 @@ model UsageSummary {
 
   @@unique([userId, provider, model, date])
   @@index([userId, date])
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  suspended Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Plan
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id])
+
+  members      OrganizationMember[]
+  invites      OrganizationInvite[]
+  providerKeys ProviderKey[]
+  platformKeys PlatformKey[]
+  requestLogs  RequestLog[]
+}
+
+model OrganizationMember {
+  id       String   @id @default(cuid())
+  orgId    String
+  userId   String
+  role     OrgRole  @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@index([userId])
+}
+
+model OrganizationInvite {
+  id        String    @id @default(cuid())
+  orgId     String
+  email     String
+  token     String    @unique
+  role      OrgRole   @default(MEMBER)
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  body        String    @db.Text
+  type        String    // info, warning, critical
+  targetRole  String    @default("all") // all, admin
+  publishedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  createdBy   String
+  createdAt   DateTime  @default(now())
+
+  creator     User                    @relation("AnnouncementCreator", fields: [createdBy], references: [id])
+  dismissals  AnnouncementDismissal[]
+
+  @@index([createdBy])
+  @@index([publishedAt])
+}
+
+model AnnouncementDismissal {
+  id             String   @id @default(cuid())
+  announcementId String
+  userId         String
+  dismissedAt    DateTime @default(now())
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation("AnnouncementDismissals", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+  @@index([userId])
+}
+
+model FeatureFlag {
+  id             String   @id @default(cuid())
+  key            String   @unique
+  description    String?
+  enabled        Boolean  @default(false)
+  rolloutPercent Int      @default(0)
+  allowedUserIds String[]
+  allowedPlanIds String[]
+  updatedAt      DateTime @updatedAt
+  updatedBy      String?
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   // JSON string for any value type
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model TotpBackupCode {
+  id       String    @id @default(cuid())
+  userId   String
+  codeHash String
+  usedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CreditTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Float    // positive = credit, negative = debit
+  reason    String
+  adminId   String   // who performed the action
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([adminId])
+}
+
+model Plan {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  monthlyPriceUsd   Float    @default(0)
+  requestsPerMonth  Int      @default(0)
+  platformKeysLimit Int      @default(5)
+  providerKeysLimit Int      @default(4)
+  teamMembersLimit  Int      @default(1)
+  logsRetentionDays Int      @default(30)
+  apiRateLimit      Int      @default(60)
+  createdAt         DateTime @default(now())
+
+  users         User[]
+  organizations Organization[]
 }

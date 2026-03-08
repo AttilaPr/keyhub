@@ -1,6 +1,10 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
-import { Sidebar } from '@/components/dashboard/sidebar'
+import { AppSidebar } from '@/components/app-sidebar'
+import { SiteHeader } from '@/components/site-header'
+import { AnnouncementBanners } from '@/components/announcement-banners'
+import { ImpersonationBanner } from '@/components/impersonation-banner'
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { ToastProvider } from '@/components/ui/toast'
 
 export default async function DashboardLayout({
@@ -13,14 +17,28 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-zinc-950">
-        <Sidebar />
-        <main className="pl-64">
-          <div className="mx-auto max-w-6xl p-8">
-            {children}
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset>
+          <ImpersonationBanner />
+          <SiteHeader />
+          <AnnouncementBanners />
+          <div className="flex flex-1 flex-col">
+            <div className="flex flex-1 flex-col gap-2">
+              <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
+                {children}
+              </div>
+            </div>
           </div>
-        </main>
-      </div>
+        </SidebarInset>
+      </SidebarProvider>
     </ToastProvider>
   )
 }
