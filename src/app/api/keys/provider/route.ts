@@ -76,6 +76,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
+  const VALID_PROVIDERS = ['openai', 'anthropic', 'google', 'mistral', 'groq']
+  if (!VALID_PROVIDERS.includes(provider)) {
+    return NextResponse.json(
+      { error: `Invalid provider. Must be one of: ${VALID_PROVIDERS.join(', ')}` },
+      { status: 400 }
+    )
+  }
+
   const parsedWeight = weight ? Math.min(10, Math.max(1, parseInt(weight, 10) || 1)) : 1
 
   // Check plan limit for new keys

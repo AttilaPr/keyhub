@@ -37,6 +37,8 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/v1') ||
+    pathname.startsWith('/api/health') ||
+    pathname.startsWith('/api/cron') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
   ) {
@@ -49,6 +51,42 @@ export async function middleware(req: NextRequest) {
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register')
   const isTotpPage = pathname === '/totp'
   const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin')
+
+  // CSRF protection for ALL mutation API routes (POST, PATCH, DELETE)
+  // Exempt: /api/auth (NextAuth), /api/v1 (already exempted above), admin routes (handled separately below)
+  if (pathname.startsWith('/api/') && !isAdminRoute) {
+    const method = req.method.toUpperCase()
+    if (method === 'POST' || method === 'PATCH' || method === 'DELETE') {
+      const csrfHeader = req.headers.get('x-csrf-token')
+      const csrfCookie = req.cookies.get('__keyhub_csrf')?.value
+      if (csrfHeader && csrfCookie && csrfHeader === csrfCookie) {
+        // CSRF token is valid — proceed
+      } else {
+        // If no cookie set yet, generate one but still block the mutation
+        if (!csrfCookie) {
+          const bytes = new Uint8Array(32)
+          crypto.getRandomValues(bytes)
+          const csrfToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+          const response = NextResponse.json(
+            { error: 'CSRF token missing. Reload the page and try again.' },
+            { status: 403 }
+          )
+          response.cookies.set('__keyhub_csrf', csrfToken, {
+            httpOnly: false,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+            path: '/',
+            maxAge: 60 * 60,
+          })
+          return response
+        }
+        return NextResponse.json(
+          { error: 'CSRF token mismatch' },
+          { status: 403 }
+        )
+      }
+    }
+  }
 
   // Admin routes: return 404 for non-admins to hide the panel's existence
   if (isAdminRoute) {
@@ -99,10 +137,25 @@ export async function middleware(req: NextRequest) {
         const csrfCookie = req.cookies.get('__keyhub_csrf')?.value
         if (csrfHeader && csrfCookie && csrfHeader === csrfCookie) {
           // CSRF token is valid — proceed
-        } else if (!csrfHeader && !csrfCookie) {
-          // No CSRF tokens set yet (first admin visit) — allow through
-          // The admin layout will set the cookie on page load
-        } else if (csrfHeader && csrfCookie && csrfHeader !== csrfCookie) {
+        } else {
+          // If no cookie set yet, generate one but still block the mutation
+          if (!csrfCookie) {
+            const bytes = new Uint8Array(32)
+            crypto.getRandomValues(bytes)
+            const csrfToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+            const response = NextResponse.json(
+              { error: 'CSRF token missing. Reload the page and try again.' },
+              { status: 403 }
+            )
+            response.cookies.set('__keyhub_csrf', csrfToken, {
+              httpOnly: false,
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production',
+              path: '/',
+              maxAge: 60 * 60,
+            })
+            return response
+          }
           return NextResponse.json(
             { error: 'CSRF token mismatch' },
             { status: 403 }
@@ -172,6 +225,22 @@ export async function middleware(req: NextRequest) {
   const isPublicPage = pathname === '/'
   if (!isLoggedIn && !isAuthPage && !isPublicPage) {
     return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  // For page requests (not API), ensure CSRF cookie exists for the double-submit pattern
+  if (!pathname.startsWith('/api/') && !req.cookies.get('__keyhub_csrf')?.value) {
+    const bytes = new Uint8Array(32)
+    crypto.getRandomValues(bytes)
+    const csrfToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+    const response = NextResponse.next()
+    response.cookies.set('__keyhub_csrf', csrfToken, {
+      httpOnly: false,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60,
+    })
+    return response
   }
 
   return NextResponse.next()

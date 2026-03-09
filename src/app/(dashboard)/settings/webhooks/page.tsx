@@ -222,10 +222,14 @@ export default function WebhooksPage() {
     }
   }
 
-  function copySecret() {
-    navigator.clipboard.writeText(newSecret)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  async function copySecret() {
+    try {
+      await navigator.clipboard.writeText(newSecret)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard API not available
+    }
   }
 
   return (

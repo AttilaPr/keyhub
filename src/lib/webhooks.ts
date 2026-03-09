@@ -1,10 +1,61 @@
 import crypto from 'crypto'
+import { isIP } from 'net'
 import prisma from '@/lib/prisma'
 
 const RETRY_DELAYS = [1000, 3000, 10000] // 1s, 3s, 10s
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * SSRF protection: block webhook URLs that resolve to private/internal IPs.
+ * Checks the hostname against known private IP ranges and localhost.
+ */
+function isPrivateOrReservedHost(hostname: string): boolean {
+  // Block localhost variants
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]') {
+    return true
+  }
+
+  // Strip brackets from IPv6
+  const cleanHost = hostname.startsWith('[') && hostname.endsWith(']')
+    ? hostname.slice(1, -1)
+    : hostname
+
+  // Check IPv6 private ranges
+  if (isIP(cleanHost) === 6) {
+    const lower = cleanHost.toLowerCase()
+    // ::1 loopback
+    if (lower === '::1') return true
+    // fc00::/7 — unique local addresses (fc00:: and fd00::)
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true
+    // fe80:: link-local
+    if (lower.startsWith('fe80')) return true
+    return false
+  }
+
+  // Check IPv4 private ranges
+  if (isIP(cleanHost) === 4) {
+    const parts = cleanHost.split('.').map(Number)
+    if (parts.length !== 4) return false
+    const [a, b] = parts
+    // 127.0.0.0/8 — loopback
+    if (a === 127) return true
+    // 10.0.0.0/8 — private
+    if (a === 10) return true
+    // 172.16.0.0/12 — private
+    if (a === 172 && b >= 16 && b <= 31) return true
+    // 192.168.0.0/16 — private
+    if (a === 192 && b === 168) return true
+    // 169.254.0.0/16 — link-local
+    if (a === 169 && b === 254) return true
+    // 0.0.0.0
+    if (a === 0) return true
+    return false
+  }
+
+  return false
 }
 
 async function attemptDelivery(
@@ -53,6 +104,29 @@ export async function dispatchWebhook(
   })
 
   for (const endpoint of endpoints) {
+    // SSRF protection: block requests to private/internal IPs
+    try {
+      const parsed = new URL(endpoint.url)
+      if (isPrivateOrReservedHost(parsed.hostname)) {
+        console.warn(`[webhooks] Blocked SSRF attempt to private IP: ${endpoint.url}`)
+        await prisma.webhookDelivery.create({
+          data: {
+            endpointId: endpoint.id,
+            event,
+            payload: JSON.stringify({ event, data: payload }),
+            statusCode: null,
+            responseBody: 'Blocked: webhook URL points to a private/internal address',
+            attemptCount: 0,
+            failedAt: new Date(),
+          },
+        })
+        continue
+      }
+    } catch {
+      console.warn(`[webhooks] Invalid webhook URL: ${endpoint.url}`)
+      continue
+    }
+
     const body = JSON.stringify({ event, data: payload, timestamp: new Date().toISOString() })
     const signature = crypto
       .createHmac('sha256', endpoint.secret)

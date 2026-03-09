@@ -132,14 +132,23 @@ export default function PlatformKeysPage() {
     return providers.flatMap((p) => (PROVIDER_MODELS[p] || []).map((m) => ({ provider: p, model: `${p}/${m}` })))
   }, [editAllowedProviders])
 
-  async function fetchKeys() {
-    const res = await fetch('/api/keys/platform')
-    const data = await res.json()
-    setKeys(data)
-    setLoading(false)
+  async function fetchKeys(signal?: AbortSignal) {
+    try {
+      const res = await fetch('/api/keys/platform', { signal })
+      const data = await res.json()
+      setKeys(data)
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { fetchKeys() }, [])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchKeys(controller.signal)
+    return () => controller.abort()
+  }, [])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -268,10 +277,14 @@ export default function PlatformKeysPage() {
     }
   }
 
-  function copyKey() {
-    navigator.clipboard.writeText(newRawKey)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  async function copyKey() {
+    try {
+      await navigator.clipboard.writeText(newRawKey)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      addToast({ title: 'Failed to copy', description: 'Could not access clipboard', variant: 'destructive' })
+    }
   }
 
   return (

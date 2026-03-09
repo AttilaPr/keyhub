@@ -15,7 +15,19 @@ export async function GET(req: Request) {
   if (type === 'provider') {
     const [keys, total] = await Promise.all([
       prisma.providerKey.findMany({
-        include: { user: { select: { email: true, name: true } } },
+        select: {
+          id: true,
+          provider: true,
+          label: true,
+          isActive: true,
+          weight: true,
+          latencyEma: true,
+          rotationReminderDays: true,
+          lastRotatedAt: true,
+          createdAt: true,
+          userId: true,
+          user: { select: { email: true, name: true } },
+        },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -27,7 +39,23 @@ export async function GET(req: Request) {
 
   const [keys, total] = await Promise.all([
     prisma.platformKey.findMany({
-      include: {
+      select: {
+        id: true,
+        label: true,
+        keyPrefix: true,
+        isActive: true,
+        rateLimit: true,
+        expiresAt: true,
+        revokedAt: true,
+        allowedProviders: true,
+        allowedModels: true,
+        ipAllowlist: true,
+        budgetUsd: true,
+        budgetPeriod: true,
+        routingStrategy: true,
+        lastUsedAt: true,
+        createdAt: true,
+        userId: true,
         user: { select: { email: true, name: true } },
         _count: { select: { logs: true } },
       },

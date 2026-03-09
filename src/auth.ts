@@ -4,6 +4,32 @@ import bcrypt from 'bcrypt'
 import prisma from '@/lib/prisma'
 import { headers } from 'next/headers'
 
+// TODO: Replace with Redis/Upstash rate limiting for production use.
+// In-memory rate limiting does not work across multiple Vercel instances,
+// but provides baseline protection for single-instance deployments.
+const LOGIN_MAX_ATTEMPTS = 5
+const LOGIN_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+const loginAttempts = new Map<string, number[]>()
+
+function isLoginRateLimited(email: string): boolean {
+  const now = Date.now()
+  const key = email.toLowerCase()
+  const attempts = loginAttempts.get(key) || []
+
+  // Remove attempts outside the window
+  const recent = attempts.filter((t) => now - t < LOGIN_WINDOW_MS)
+  loginAttempts.set(key, recent)
+
+  return recent.length >= LOGIN_MAX_ATTEMPTS
+}
+
+function recordFailedLogin(email: string): void {
+  const key = email.toLowerCase()
+  const attempts = loginAttempts.get(key) || []
+  attempts.push(Date.now())
+  loginAttempts.set(key, attempts)
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   providers: [
@@ -16,18 +42,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
+        const email = credentials.email as string
+
+        // Rate limit check
+        if (isLoginRateLimited(email)) {
+          return null
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email },
         })
 
-        if (!user) return null
+        if (!user) {
+          recordFailedLogin(email)
+          return null
+        }
 
         const passwordMatch = await bcrypt.compare(
           credentials.password as string,
           user.passwordHash
         )
 
-        if (!passwordMatch) return null
+        if (!passwordMatch) {
+          recordFailedLogin(email)
+          return null
+        }
 
         // Block suspended users from logging in
         if (user.suspended) return null

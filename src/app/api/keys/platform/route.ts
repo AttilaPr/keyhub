@@ -117,7 +117,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const { raw, prefix, hash } = generatePlatformKey()
+  const { raw, prefix, hash } = await generatePlatformKey()
 
   const key = await prisma.platformKey.create({
     data: {

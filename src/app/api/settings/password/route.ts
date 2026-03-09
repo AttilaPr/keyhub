@@ -36,7 +36,7 @@ export async function PATCH(req: Request) {
   const passwordHash = await bcrypt.hash(newPassword, 12)
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { passwordHash },
+    data: { passwordHash, sessionInvalidatedAt: new Date() },
   })
 
   return NextResponse.json({ success: true })

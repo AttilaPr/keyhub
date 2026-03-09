@@ -346,10 +346,14 @@ export default function SettingsPage() {
     }
   }
 
-  function handleCopyBackupCodes() {
+  async function handleCopyBackupCodes() {
     const text = backupCodes.join('\n')
-    navigator.clipboard.writeText(text)
-    addToast({ title: 'Copied', description: 'Backup codes copied to clipboard.', variant: 'success' })
+    try {
+      await navigator.clipboard.writeText(text)
+      addToast({ title: 'Copied', description: 'Backup codes copied to clipboard.', variant: 'success' })
+    } catch {
+      addToast({ title: 'Failed to copy', description: 'Could not access clipboard', variant: 'destructive' })
+    }
   }
 
   function handleDownloadBackupCodes() {
@@ -668,9 +672,13 @@ export default function SettingsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(manualEntryKey)
-                        addToast({ title: 'Copied', description: 'Manual entry key copied.', variant: 'success' })
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(manualEntryKey)
+                          addToast({ title: 'Copied', description: 'Manual entry key copied.', variant: 'success' })
+                        } catch {
+                          addToast({ title: 'Failed to copy', description: 'Could not access clipboard', variant: 'destructive' })
+                        }
                       }}
                     >
                       <CopyIcon size={16} />

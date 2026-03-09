@@ -15,7 +15,23 @@ export async function GET(req: Request) {
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const rangeStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 
-  const [monthSpend, todayRequests, totalRequests, failedRequests, recentLogs, providerSpend, keySpend, modelSpend, modelErrors, avgLatencyAgg, tokenAgg, latestRequests] = await Promise.all([
+  // Use SQL-level aggregation instead of loading all logs into memory
+  const [
+    monthSpend,
+    todayRequests,
+    totalRequests,
+    failedRequests,
+    dailyChartRaw,
+    providerSpend,
+    keySpend,
+    modelSpend,
+    modelErrors,
+    avgLatencyAgg,
+    tokenAgg,
+    latestRequests,
+    latencyPercentileData,
+    monthDailyCosts,
+  ] = await Promise.all([
     prisma.requestLog.aggregate({
       where: { userId, createdAt: { gte: startOfMonth } },
       _sum: { costUsd: true },
@@ -29,11 +45,29 @@ export async function GET(req: Request) {
     prisma.requestLog.count({
       where: { userId, status: 'failed', createdAt: { gte: rangeStart } },
     }),
-    prisma.requestLog.findMany({
-      where: { userId, createdAt: { gte: rangeStart } },
-      select: { createdAt: true, costUsd: true, status: true, latencyMs: true, totalTokens: true, promptTokens: true, completionTokens: true },
-      orderBy: { createdAt: 'asc' },
-    }),
+    // Daily chart aggregation in SQL instead of loading all rows
+    prisma.$queryRaw<Array<{
+      date: string
+      requests: bigint
+      cost: number
+      tokens: bigint
+      prompt_tokens: bigint
+      completion_tokens: bigint
+      avg_latency: number
+    }>>`
+      SELECT
+        TO_CHAR("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') as date,
+        COUNT(*)::bigint as requests,
+        COALESCE(SUM("costUsd"), 0) as cost,
+        COALESCE(SUM("totalTokens"), 0)::bigint as tokens,
+        COALESCE(SUM("promptTokens"), 0)::bigint as prompt_tokens,
+        COALESCE(SUM("completionTokens"), 0)::bigint as completion_tokens,
+        COALESCE(AVG(NULLIF("latencyMs", 0)), 0) as avg_latency
+      FROM "RequestLog"
+      WHERE "userId" = ${userId} AND "createdAt" >= ${rangeStart}
+      GROUP BY TO_CHAR("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')
+      ORDER BY date ASC
+    `,
     prisma.requestLog.groupBy({
       by: ['provider'],
       where: { userId, createdAt: { gte: rangeStart } },
@@ -81,44 +115,56 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
       take: 5,
     }),
+    // Compute latency percentiles in SQL
+    prisma.$queryRaw<Array<{
+      p50: number
+      p90: number
+      p95: number
+      p99: number
+      cnt: bigint
+    }>>`
+      SELECT
+        COALESCE(PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY "latencyMs"), 0) as p50,
+        COALESCE(PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY "latencyMs"), 0) as p90,
+        COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "latencyMs"), 0) as p95,
+        COALESCE(PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY "latencyMs"), 0) as p99,
+        COUNT(*)::bigint as cnt
+      FROM "RequestLog"
+      WHERE "userId" = ${userId}
+        AND "createdAt" >= ${rangeStart}
+        AND "latencyMs" > 0
+    `,
+    // Monthly daily costs for cost forecasting (SQL aggregation)
+    prisma.$queryRaw<Array<{ date: string; cost: number }>>`
+      SELECT
+        TO_CHAR("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') as date,
+        COALESCE(SUM("costUsd"), 0) as cost
+      FROM "RequestLog"
+      WHERE "userId" = ${userId} AND "createdAt" >= ${startOfMonth}
+      GROUP BY TO_CHAR("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')
+      ORDER BY date ASC
+    `,
   ])
 
-  // Aggregate daily requests for chart
-  const dailyData: Record<string, { date: string; requests: number; cost: number; tokens: number; promptTokens: number; completionTokens: number; totalLatency: number; latencyCount: number }> = {}
-  for (const log of recentLogs) {
-    const dateStr = log.createdAt.toISOString().split('T')[0]
-    if (!dailyData[dateStr]) {
-      dailyData[dateStr] = { date: dateStr, requests: 0, cost: 0, tokens: 0, promptTokens: 0, completionTokens: 0, totalLatency: 0, latencyCount: 0 }
-    }
-    dailyData[dateStr].requests++
-    dailyData[dateStr].cost += log.costUsd
-    dailyData[dateStr].tokens += log.totalTokens
-    dailyData[dateStr].promptTokens += log.promptTokens
-    dailyData[dateStr].completionTokens += log.completionTokens
-    if (log.latencyMs) {
-      dailyData[dateStr].totalLatency += log.latencyMs
-      dailyData[dateStr].latencyCount++
-    }
-  }
+  // Build daily chart from SQL results
+  const dailyChart = dailyChartRaw.map((d) => ({
+    date: d.date,
+    requests: Number(d.requests),
+    cost: Number(d.cost),
+    tokens: Number(d.tokens),
+    promptTokens: Number(d.prompt_tokens),
+    completionTokens: Number(d.completion_tokens),
+    avgLatency: Math.round(Number(d.avg_latency)),
+  }))
 
-  // Compute latency percentiles
-  const latencyValues = recentLogs
-    .filter((l) => l.latencyMs > 0)
-    .map((l) => l.latencyMs)
-    .sort((a, b) => a - b)
-
-  function percentile(sorted: number[], p: number): number {
-    if (sorted.length === 0) return 0
-    const idx = Math.ceil((p / 100) * sorted.length) - 1
-    return sorted[Math.max(0, idx)]
-  }
-
+  // Latency percentiles from SQL
+  const pData = latencyPercentileData[0]
   const latencyPercentiles = {
-    p50: percentile(latencyValues, 50),
-    p90: percentile(latencyValues, 90),
-    p95: percentile(latencyValues, 95),
-    p99: percentile(latencyValues, 99),
-    count: latencyValues.length,
+    p50: Math.round(Number(pData?.p50 ?? 0)),
+    p90: Math.round(Number(pData?.p90 ?? 0)),
+    p95: Math.round(Number(pData?.p95 ?? 0)),
+    p99: Math.round(Number(pData?.p99 ?? 0)),
+    count: Number(pData?.cnt ?? 0),
   }
 
   // Resolve platform key labels for key breakdown
@@ -132,29 +178,12 @@ export async function GET(req: Request) {
   const keyLabelMap = new Map(platformKeys.map((k) => [k.id, { label: k.label, keyPrefix: k.keyPrefix }]))
 
   // Cost forecasting: linear regression on daily costs for current month
-  const monthLogs = recentLogs.filter((l) => l.createdAt >= startOfMonth)
-  const monthDailyData: Record<string, number> = {}
-  for (const log of monthLogs) {
-    const dateStr = log.createdAt.toISOString().split('T')[0]
-    monthDailyData[dateStr] = (monthDailyData[dateStr] || 0) + log.costUsd
-  }
-
-  // Also include days from the month start that might not be in recentLogs range
-  // Use dailyData entries that fall within current month
-  for (const [dateStr, d] of Object.entries(dailyData)) {
-    if (new Date(dateStr) >= startOfMonth) {
-      monthDailyData[dateStr] = d.cost
-    }
-  }
-
   let costForecast: { projected: number; confidence: number; overBudget: boolean; delta: number } | null = null
 
-  const monthDailyEntries = Object.entries(monthDailyData).sort(([a], [b]) => a.localeCompare(b))
-  if (monthDailyEntries.length >= 2) {
-    // Linear regression: y = mx + b where x is day index (0-based)
-    const n = monthDailyEntries.length
-    const xs = monthDailyEntries.map((_, i) => i)
-    const ys = monthDailyEntries.map(([, cost]) => cost)
+  if (monthDailyCosts.length >= 2) {
+    const n = monthDailyCosts.length
+    const ys = monthDailyCosts.map((d) => Number(d.cost))
+    const xs = monthDailyCosts.map((_, i) => i)
     const sumX = xs.reduce((a, b) => a + b, 0)
     const sumY = ys.reduce((a, b) => a + b, 0)
     const sumXY = xs.reduce((a, x, i) => a + x * ys[i], 0)
@@ -165,25 +194,21 @@ export async function GET(req: Request) {
     const m = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0
     const b = meanY - m * (sumX / n)
 
-    // Project to month end
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-    const daysSoFar = n
     let projected = 0
     for (let d = 0; d < daysInMonth; d++) {
-      if (d < daysSoFar) {
+      if (d < n) {
         projected += ys[d]
       } else {
         projected += Math.max(0, m * d + b)
       }
     }
 
-    // Compute confidence based on R-squared
     const ssTot = ys.reduce((a, y) => a + (y - meanY) ** 2, 0)
     const ssRes = ys.reduce((a, y, i) => a + (y - (m * xs[i] + b)) ** 2, 0)
     const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 0
     const confidence = Math.max(0, Math.min(100, Math.round(rSquared * 100)))
 
-    // Get monthly budget for over-budget detection
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { monthlyBudgetUsd: true },
@@ -213,15 +238,7 @@ export async function GET(req: Request) {
     totalTokens: tokenAgg._sum.totalTokens || 0,
     promptTokens: tokenAgg._sum.promptTokens || 0,
     completionTokens: tokenAgg._sum.completionTokens || 0,
-    dailyChart: Object.values(dailyData).map(d => ({
-      date: d.date,
-      requests: d.requests,
-      cost: d.cost,
-      tokens: d.tokens,
-      promptTokens: d.promptTokens,
-      completionTokens: d.completionTokens,
-      avgLatency: d.latencyCount > 0 ? Math.round(d.totalLatency / d.latencyCount) : 0,
-    })),
+    dailyChart,
     providerBreakdown: providerSpend.map((p) => ({
       provider: p.provider,
       cost: p._sum.costUsd || 0,

@@ -17,10 +17,10 @@ const ALERT_COOLDOWN_MS = 60 * 60 * 1000 // 1 hour
  * Body: { userId: string, platformKeyId?: string }
  */
 export async function POST(req: Request) {
-  // Validate internal call — only accept from same origin or with valid auth
+  // Validate internal call — require INTERNAL_API_SECRET always
   const authHeader = req.headers.get('x-internal-secret')
   const internalSecret = process.env.INTERNAL_API_SECRET
-  if (internalSecret && authHeader !== internalSecret) {
+  if (!internalSecret || authHeader !== internalSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

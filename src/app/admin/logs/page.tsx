@@ -91,10 +91,14 @@ export default function AdminLogsPage() {
     }
   }, [liveMode, fetchLogs])
 
-  function copyToClipboard(text: string, field: string) {
-    navigator.clipboard.writeText(text)
-    setCopiedField(field)
-    setTimeout(() => setCopiedField(null), 2000)
+  async function copyToClipboard(text: string, field: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      // Clipboard API not available
+    }
   }
 
   function exportCSV() {

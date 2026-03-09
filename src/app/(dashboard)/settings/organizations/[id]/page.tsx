@@ -324,10 +324,14 @@ export default function OrgSettingsPage() {
     }
   }
 
-  function copyInviteLink(token: string) {
+  async function copyInviteLink(token: string) {
     const url = `${window.location.origin}/invite/${token}`
-    navigator.clipboard.writeText(url)
-    addToast({ title: 'Invite link copied', variant: 'success' })
+    try {
+      await navigator.clipboard.writeText(url)
+      addToast({ title: 'Invite link copied', variant: 'success' })
+    } catch {
+      addToast({ title: 'Failed to copy', description: 'Could not access clipboard', variant: 'destructive' })
+    }
   }
 
   function roleIcon(role: string) {

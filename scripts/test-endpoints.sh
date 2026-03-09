@@ -62,11 +62,17 @@ section() {
   echo -e "\n${CYAN}━━━ $1 ━━━${NC}"
 }
 
-# Helper: authenticated request
+# Helper: extract CSRF token from cookie jar
+get_csrf() {
+  local jar="$1"
+  grep '__keyhub_csrf' "$jar" 2>/dev/null | awk '{print $NF}' | tail -1
+}
+
+# Helper: authenticated request (with CSRF for mutations)
 auth_get() { curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$COOKIE_JAR" "$BASE$1" 2>/dev/null; }
-auth_post() { curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$COOKIE_JAR" -H "Content-Type: application/json" -d "$2" "$BASE$1" 2>/dev/null; }
-auth_patch() { curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$COOKIE_JAR" -H "Content-Type: application/json" -X PATCH -d "$2" "$BASE$1" 2>/dev/null; }
-auth_delete() { curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$COOKIE_JAR" -X DELETE "$BASE$1" 2>/dev/null; }
+auth_post() { local csrf; csrf=$(get_csrf "$COOKIE_JAR"); curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$COOKIE_JAR" -H "Content-Type: application/json" -H "x-csrf-token: $csrf" -d "$2" "$BASE$1" 2>/dev/null; }
+auth_patch() { local csrf; csrf=$(get_csrf "$COOKIE_JAR"); curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$COOKIE_JAR" -H "Content-Type: application/json" -H "x-csrf-token: $csrf" -X PATCH -d "$2" "$BASE$1" 2>/dev/null; }
+auth_delete() { local csrf; csrf=$(get_csrf "$COOKIE_JAR"); curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$COOKIE_JAR" -H "x-csrf-token: $csrf" -X DELETE "$BASE$1" 2>/dev/null; }
 admin_get() { curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$ADMIN_COOKIE_JAR" "$BASE$1" 2>/dev/null; }
 admin_post() { curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$ADMIN_COOKIE_JAR" -H "Content-Type: application/json" -d "$2" "$BASE$1" 2>/dev/null; }
 admin_patch() { curl -s -o /tmp/keyhub-resp.json -w "%{http_code}" -b "$ADMIN_COOKIE_JAR" -H "Content-Type: application/json" -X PATCH -d "$2" "$BASE$1" 2>/dev/null; }
@@ -130,6 +136,15 @@ code=$(auth_get "/api/auth/session")
 SESSION=$(resp)
 HAS_USER=$(echo "$SESSION" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('user',{}).get('email') else 'no')" 2>/dev/null || echo "no")
 check "Session has user" "yes" "$HAS_USER"
+
+# Visit a page to get the CSRF cookie set
+curl -s -o /dev/null -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE/dashboard" 2>/dev/null
+CSRF_VAL=$(get_csrf "$COOKIE_JAR")
+if [ -n "$CSRF_VAL" ]; then
+  check "CSRF cookie set on page visit" "non-empty" "non-empty"
+else
+  echo -e "  ${YELLOW}⊘${NC} No CSRF cookie (mutations will fail)"
+fi
 
 # ─── 3. UNAUTHENTICATED ACCESS ─────────────────────────
 section "3. Auth — Unauthenticated access blocked"
@@ -236,12 +251,6 @@ section "9. Settings"
 
 code=$(auth_patch "/api/settings/profile" '{"name":"Updated Test User"}')
 check "Update profile (PATCH)" "200" "$code"
-
-code=$(auth_patch "/api/settings/password" '{"currentPassword":"TestPass123!","newPassword":"NewPass456!"}')
-check "Change password (PATCH)" "200" "$code"
-
-# Change it back
-auth_patch "/api/settings/password" '{"currentPassword":"NewPass456!","newPassword":"TestPass123!"}' >/dev/null
 
 code=$(auth_post "/api/settings/export" '{}')
 check "Export settings/data (POST)" "200" "$code"
@@ -401,8 +410,36 @@ for page in "/login" "/register"; do
   check "Page $page (public)" "200" "$code"
 done
 
-# ─── 17. CLEANUP ─────────────────────────────────────────
-section "17. Cleanup"
+# ─── 17. PASSWORD CHANGE (last, invalidates session) ────
+section "17. Password Change + Session Invalidation"
+
+code=$(auth_patch "/api/settings/password" '{"currentPassword":"TestPass123!","newPassword":"NewPass456!"}')
+check "Change password" "200" "$code"
+
+# Verify session was invalidated
+code=$(auth_get "/api/settings/notifications")
+check "Session invalidated after pw change" "401" "$code"
+
+# Re-login with new password, restore original, re-login again
+CSRF_RESP=$(curl -s -c "$COOKIE_JAR" "$BASE/api/auth/csrf" 2>/dev/null)
+CSRF_TOKEN=$(echo "$CSRF_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('csrfToken',''))" 2>/dev/null || echo "")
+curl -s -o /dev/null -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "csrfToken=${CSRF_TOKEN}&email=test@keyhub.test&password=NewPass456!&redirect=false&callbackUrl=/&json=true" \
+  "$BASE/api/auth/callback/credentials" 2>/dev/null
+curl -s -o /dev/null -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE/dashboard" 2>/dev/null
+auth_patch "/api/settings/password" '{"currentPassword":"NewPass456!","newPassword":"TestPass123!"}' >/dev/null
+# Re-login with original password for cleanup
+CSRF_RESP=$(curl -s -c "$COOKIE_JAR" "$BASE/api/auth/csrf" 2>/dev/null)
+CSRF_TOKEN=$(echo "$CSRF_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('csrfToken',''))" 2>/dev/null || echo "")
+curl -s -o /dev/null -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "csrfToken=${CSRF_TOKEN}&email=test@keyhub.test&password=TestPass123!&redirect=false&callbackUrl=/&json=true" \
+  "$BASE/api/auth/callback/credentials" 2>/dev/null
+curl -s -o /dev/null -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE/dashboard" 2>/dev/null
+
+# ─── 18. CLEANUP ─────────────────────────────────────────
+section "18. Cleanup"
 
 # Delete test provider key
 if [ -n "$PROVIDER_KEY_ID" ]; then

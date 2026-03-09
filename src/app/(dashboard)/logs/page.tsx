@@ -161,10 +161,14 @@ export default function LogsPage() {
       : <span className="ml-1 text-primary"><ArrowDownIcon size={14} /></span>
   }
 
-  function copyToClipboard(text: string, field: string) {
-    navigator.clipboard.writeText(text)
-    setCopiedField(field)
-    setTimeout(() => setCopiedField(null), 2000)
+  async function copyToClipboard(text: string, field: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      addToast({ title: 'Failed to copy', description: 'Could not access clipboard', variant: 'destructive' })
+    }
   }
 
   async function handleReplay(log: LogEntry) {
@@ -250,7 +254,7 @@ export default function LogsPage() {
     }
   }
 
-  async function fetchLogs() {
+  async function fetchLogs(signal?: AbortSignal) {
     setLoading(true)
     setError(null)
     const params = new URLSearchParams({ page: String(page), limit: '25' })
@@ -266,12 +270,13 @@ export default function LogsPage() {
     if (sortOrder !== 'desc') params.set('sortOrder', sortOrder)
 
     try {
-      const res = await fetch(`/api/logs?${params}`)
+      const res = await fetch(`/api/logs?${params}`, { signal })
       if (!res.ok) throw new Error(`Server error (${res.status})`)
       const data = await res.json()
       setLogs(data.logs)
       setTotal(data.total)
     } catch (err: any) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err.message || 'Failed to load logs')
       setLogs([])
       setTotal(0)
@@ -280,7 +285,11 @@ export default function LogsPage() {
     }
   }
 
-  useEffect(() => { fetchLogs() }, [page, providerFilter, statusFilter, modelFilter, keyFilter, tagFilter, fromDate, toDate, searchQuery, sortBy, sortOrder])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchLogs(controller.signal)
+    return () => controller.abort()
+  }, [page, providerFilter, statusFilter, modelFilter, keyFilter, tagFilter, fromDate, toDate, searchQuery, sortBy, sortOrder])
 
   const availableModels = providerFilter !== 'all'
     ? PROVIDER_MODELS[providerFilter] || []
@@ -461,7 +470,7 @@ export default function LogsPage() {
             <span className="text-red-400 mb-4"><BadgeAlertIcon ref={errorIconRef} size={48} /></span>
             <p className="text-muted-foreground font-medium mb-1">Failed to load logs</p>
             <p className="text-muted-foreground text-sm mb-4">{error}</p>
-            <Button variant="outline" onClick={fetchLogs} className="gap-2">
+            <Button variant="outline" onClick={() => fetchLogs()} className="gap-2">
               <RefreshCWIcon size={16} />
               Retry
             </Button>

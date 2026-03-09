@@ -281,10 +281,14 @@ export default function OrganizationDetailPage() {
     }
   }
 
-  function copyInviteLink() {
-    navigator.clipboard.writeText(inviteLink)
-    setLinkCopied(true)
-    setTimeout(() => setLinkCopied(false), 2000)
+  async function copyInviteLink() {
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      // Clipboard API not available
+    }
   }
 
   function roleBadgeClass(role: string) {

@@ -44,31 +44,39 @@ export default function DashboardPage() {
 
   const { iconRef: errorIconRef, handlers: errorHandlers } = useAnimatedIcon()
 
-  function fetchDashboard() {
+  function fetchDashboard(signal?: AbortSignal) {
     setLoading(true)
     setError(null)
     Promise.all([
-      fetch(`/api/dashboard?days=${days}`)
+      fetch(`/api/dashboard?days=${days}`, { signal })
         .then((res) => {
           if (!res.ok) throw new Error(`Server error (${res.status})`)
           return res.json()
         }),
-      fetch('/api/budget')
+      fetch('/api/budget', { signal })
         .then((res) => res.ok ? res.json() : null)
-        .catch(() => null),
+        .catch((e) => {
+          if (e instanceof DOMException && e.name === 'AbortError') throw e
+          return null
+        }),
     ])
       .then(([dashData, budgetData]) => {
         setData(dashData)
         setBudget(budgetData)
       })
       .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
         setError(err.message || 'Failed to load dashboard data')
         setData(null)
       })
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchDashboard() }, [days])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchDashboard(controller.signal)
+    return () => controller.abort()
+  }, [days])
 
   // Compute dynamic grid columns for chart row
   const visibleCharts = ['requests-chart', 'daily-cost-chart', 'latency-chart'].filter(id => isVisible(id))
@@ -148,7 +156,7 @@ export default function DashboardPage() {
             <p className="text-muted-foreground text-sm mb-4">{error || 'An unexpected error occurred'}</p>
             <Button
               variant="outline"
-              onClick={fetchDashboard}
+              onClick={() => fetchDashboard()}
               className="gap-2"
             >
               <RefreshCWIcon size={16} />

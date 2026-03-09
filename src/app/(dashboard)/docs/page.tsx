@@ -126,10 +126,14 @@ export default function DocsPage() {
       .finally(() => setSetupLoading(false))
   }, [])
 
-  function copyCode(code: string, index: number) {
-    navigator.clipboard.writeText(code)
-    setCopiedIndex(index)
-    setTimeout(() => setCopiedIndex(null), 2000)
+  async function copyCode(code: string, index: number) {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedIndex(index)
+      setTimeout(() => setCopiedIndex(null), 2000)
+    } catch {
+      // Clipboard API not available
+    }
   }
 
   return (

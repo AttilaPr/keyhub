@@ -276,15 +276,24 @@ export default function ProviderKeysPage() {
 
   const { iconRef: emptyKeyRef, handlers: emptyKeyHandlers } = useAnimatedIcon()
 
-  async function fetchKeys() {
-    const res = await fetch('/api/keys/provider')
-    const data = await res.json()
-    // Support both paginated { keys, total } and legacy array responses
-    setKeys(Array.isArray(data) ? data : data.keys ?? [])
-    setLoading(false)
+  async function fetchKeys(signal?: AbortSignal) {
+    try {
+      const res = await fetch('/api/keys/provider', { signal })
+      const data = await res.json()
+      // Support both paginated { keys, total } and legacy array responses
+      setKeys(Array.isArray(data) ? data : data.keys ?? [])
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { fetchKeys() }, [])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchKeys(controller.signal)
+    return () => controller.abort()
+  }, [])
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()

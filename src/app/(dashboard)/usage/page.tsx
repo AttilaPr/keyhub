@@ -88,21 +88,27 @@ export default function UsagePage() {
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState('30')
 
-  function fetchUsage() {
+  function fetchUsage(signal?: AbortSignal) {
     setLoading(true)
     setError(null)
     Promise.all([
-      fetch(`/api/dashboard?days=${days}`)
+      fetch(`/api/dashboard?days=${days}`, { signal })
         .then((res) => {
           if (!res.ok) throw new Error(`Server error (${res.status})`)
           return res.json()
         }),
-      fetch(`/api/usage?days=${days}`)
+      fetch(`/api/usage?days=${days}`, { signal })
         .then((res) => res.ok ? res.json() : null)
-        .catch(() => null),
-      fetch('/api/usage/what-if?limit=1000')
+        .catch((e) => {
+          if (e instanceof DOMException && e.name === 'AbortError') throw e
+          return null
+        }),
+      fetch('/api/usage/what-if?limit=1000', { signal })
         .then((res) => res.ok ? res.json() : null)
-        .catch(() => null),
+        .catch((e) => {
+          if (e instanceof DOMException && e.name === 'AbortError') throw e
+          return null
+        }),
     ])
       .then(([dashData, usageData, whatIf]) => {
         setData(dashData)
@@ -110,13 +116,18 @@ export default function UsagePage() {
         setWhatIfData(whatIf)
       })
       .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
         setError(err.message || 'Failed to load usage data')
         setData(null)
       })
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchUsage() }, [days])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchUsage(controller.signal)
+    return () => controller.abort()
+  }, [days])
 
   if (loading) {
     return (
@@ -176,7 +187,7 @@ export default function UsagePage() {
             <p className="text-muted-foreground text-sm mb-4">{error || 'An unexpected error occurred'}</p>
             <Button
               variant="outline"
-              onClick={fetchUsage}
+              onClick={() => fetchUsage()}
               className="gap-2"
             >
               <RefreshCWIcon size={16} />

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -132,6 +133,7 @@ model PlatformKey {
   logs          RequestLog[]
   fallbackRules FallbackRule[]
 
+  @@index([keyPrefix])
   @@index([orgId])
 }
 
@@ -184,6 +186,7 @@ model RequestLog {
   @@index([userId, provider])
   @@index([userId, status])
   @@index([userId, tag])
+  @@index([platformKeyId, createdAt])
   @@index([orgId])
 }
 
