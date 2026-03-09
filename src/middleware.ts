@@ -43,7 +43,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+  const secureCookie = req.nextUrl.protocol === 'https:'
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, secureCookie })
   const isLoggedIn = !!token
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register')
   const isTotpPage = pathname === '/totp'
