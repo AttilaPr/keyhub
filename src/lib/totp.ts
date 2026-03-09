@@ -26,14 +26,16 @@ export function generateTotpSecret(email: string): {
 }
 
 export async function generateQrCodeDataUrl(otpauthUrl: string): Promise<string> {
-  return QRCode.toDataURL(otpauthUrl, {
+  const svgString = await QRCode.toString(otpauthUrl, {
+    type: 'svg',
     width: 256,
     margin: 2,
     color: {
-      dark: '#ffffffff',
-      light: '#00000000',
+      dark: '#000000',
+      light: '#ffffff',
     },
   })
+  return `data:image/svg+xml;base64,${Buffer.from(svgString).toString('base64')}`
 }
 
 export function verifyTotpCode(secret: string, code: string): boolean {
