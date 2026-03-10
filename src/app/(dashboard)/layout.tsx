@@ -6,6 +6,7 @@ import { AnnouncementBanners } from '@/components/announcement-banners'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { ToastProvider } from '@/components/ui/toast'
+import { OrgsProvider } from '@/contexts/orgs-context'
 
 export default async function DashboardLayout({
   children,
@@ -16,6 +17,7 @@ export default async function DashboardLayout({
   if (!session) redirect('/login')
 
   return (
+    <OrgsProvider>
     <ToastProvider>
       <SidebarProvider
         style={
@@ -40,5 +42,6 @@ export default async function DashboardLayout({
         </SidebarInset>
       </SidebarProvider>
     </ToastProvider>
+    </OrgsProvider>
   )
 }

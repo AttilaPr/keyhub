@@ -16,6 +16,7 @@ import { UsersIcon } from '@/components/ui/users'
 import { LoaderPinwheelIcon } from '@/components/ui/loader-pinwheel'
 import { ArrowRightIcon } from '@/components/ui/arrow-right'
 import { apiFetch } from '@/lib/fetch'
+import { useOrgs } from '@/contexts/orgs-context'
 
 interface Org {
   id: string
@@ -34,6 +35,7 @@ export default function OrganizationsPage() {
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
   const { addToast } = useToast()
+  const { refreshOrgs: refreshSidebarOrgs } = useOrgs()
 
   async function fetchOrgs() {
     try {
@@ -66,6 +68,7 @@ export default function OrganizationsPage() {
         setCreateOpen(false)
         setNewName('')
         fetchOrgs()
+        refreshSidebarOrgs()
       } else {
         const data = await res.json()
         addToast({ title: 'Error', description: data.error, variant: 'destructive' })

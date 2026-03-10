@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -76,7 +77,7 @@ export default function WebhooksPage() {
   const [saving, setSaving] = useState(false)
   const [showSecretOpen, setShowSecretOpen] = useState(false)
   const [newSecret, setNewSecret] = useState('')
-  const [copied, setCopied] = useState(false)
+  const { copy, copied } = useCopyToClipboard()
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -224,13 +225,7 @@ export default function WebhooksPage() {
   }
 
   async function copySecret() {
-    try {
-      await navigator.clipboard.writeText(newSecret)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Clipboard API not available
-    }
+    await copy(newSecret)
   }
 
   return (

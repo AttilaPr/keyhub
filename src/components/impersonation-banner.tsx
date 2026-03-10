@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/fetch'
 import { Button } from '@/components/ui/button'
 import { LogoutIcon } from '@/components/ui/logout'
@@ -13,14 +14,15 @@ interface ImpersonationData {
 }
 
 export function ImpersonationBanner() {
+  const router = useRouter()
   const [data, setData] = useState<ImpersonationData | null>(null)
   const [exiting, setExiting] = useState(false)
 
   useEffect(() => {
-    // Check session for impersonation fields
-    fetch('/api/auth/session')
-      .then((res) => res.json())
-      .then((session) => {
+    async function checkImpersonation() {
+      try {
+        const res = await fetch('/api/auth/session')
+        const session = await res.json()
         if (session?.impersonating && session?.impersonatedBy) {
           setData({
             targetEmail: session.impersonating,
@@ -28,10 +30,11 @@ export function ImpersonationBanner() {
             adminId: session.impersonatedBy,
           })
         }
-      })
-      .catch(() => {
+      } catch {
         // Ignore errors
-      })
+      }
+    }
+    checkImpersonation()
   }, [])
 
   if (!data) return null
@@ -44,11 +47,11 @@ export function ImpersonationBanner() {
         headers: { 'Content-Type': 'application/json' },
       })
       if (res.ok) {
-        window.location.href = '/admin/users'
+        router.push('/admin/users')
       }
     } catch {
-      // Force reload on error
-      window.location.reload()
+      // Force refresh on error
+      router.refresh()
     } finally {
       setExiting(false)
     }

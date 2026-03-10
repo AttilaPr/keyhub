@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { apiFetch } from '@/lib/fetch'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -70,6 +72,7 @@ export default function OrganizationDetailPage() {
   const orgId = params.id as string
   const { data: session } = useSession()
   const { addToast } = useToast()
+  const { refreshOrgs: refreshSidebarOrgs } = useOrgs()
 
   const [org, setOrg] = useState<OrgInfo | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -87,7 +90,7 @@ export default function OrganizationDetailPage() {
   const [sendingInvite, setSendingInvite] = useState(false)
   const [inviteLinkOpen, setInviteLinkOpen] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
-  const [linkCopied, setLinkCopied] = useState(false)
+  const { copy, copied: linkCopied } = useCopyToClipboard()
 
   // Remove member state
   const [removeMember, setRemoveMember] = useState<Member | null>(null)
@@ -270,6 +273,7 @@ export default function OrganizationDetailPage() {
       const res = await apiFetch(`/api/orgs/${orgId}`, { method: 'DELETE' })
       if (res.ok) {
         addToast({ title: 'Organization deleted', variant: 'success' })
+        refreshSidebarOrgs()
         router.push('/organizations')
       } else {
         const data = await res.json()
@@ -283,13 +287,7 @@ export default function OrganizationDetailPage() {
   }
 
   async function copyInviteLink() {
-    try {
-      await navigator.clipboard.writeText(inviteLink)
-      setLinkCopied(true)
-      setTimeout(() => setLinkCopied(false), 2000)
-    } catch {
-      // Clipboard API not available
-    }
+    await copy(inviteLink)
   }
 
   function roleBadgeClass(role: string) {

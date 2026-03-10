@@ -121,32 +121,45 @@ export default function PlaygroundPage() {
 
     setSessions(loadSessions())
 
-    fetch('/api/keys/provider')
-      .then((res) => res.ok ? res.json() : [])
-      .then((keys: { provider: string; isActive: boolean }[]) => {
-        setActiveProviders(new Set(keys.filter((k) => k.isActive).map((k) => k.provider)))
-      })
-      .catch(() => {})
+    const controller = new AbortController()
+    const { signal } = controller
 
-    fetch('/api/models')
-      .then((res) => res.ok ? res.json() : null)
-      .then((data: { providers: ModelGroup[] } | null) => {
-        if (data?.providers?.length) setAllModels(data.providers)
-      })
-      .catch(() => {})
+    async function loadInitialData() {
+      try {
+        const [providerRes, modelsRes, platformRes, templatesRes] = await Promise.all([
+          fetch('/api/keys/provider', { signal }),
+          fetch('/api/models', { signal }),
+          fetch('/api/keys/platform', { signal }),
+          fetch('/api/templates', { signal }),
+        ])
 
-    fetch('/api/keys/platform')
-      .then((res) => res.ok ? res.json() : [])
-      .then((keys: any[]) => {
-        const active = keys.filter((k) => k.isActive)
-        setPlatformKeys(active.map((k) => ({ id: k.id, label: k.label, keyPrefix: k.keyPrefix })))
-      })
-      .catch(() => {})
+        if (providerRes.ok) {
+          const keys: { provider: string; isActive: boolean }[] = await providerRes.json()
+          setActiveProviders(new Set(keys.filter((k) => k.isActive).map((k) => k.provider)))
+        }
 
-    fetch('/api/templates')
-      .then((res) => res.ok ? res.json() : [])
-      .then((data: PromptTemplate[]) => setTemplates(data))
-      .catch(() => {})
+        if (modelsRes.ok) {
+          const data: { providers: ModelGroup[] } | null = await modelsRes.json()
+          if (data?.providers?.length) setAllModels(data.providers)
+        }
+
+        if (platformRes.ok) {
+          const keys: { id: string; label: string; keyPrefix: string; isActive: boolean }[] = await platformRes.json()
+          const active = keys.filter((k) => k.isActive)
+          setPlatformKeys(active.map((k) => ({ id: k.id, label: k.label, keyPrefix: k.keyPrefix })))
+        }
+
+        if (templatesRes.ok) {
+          const data: PromptTemplate[] = await templatesRes.json()
+          setTemplates(data)
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      }
+    }
+
+    loadInitialData()
+    return () => controller.abort()
   }, [])
 
   useEffect(() => {

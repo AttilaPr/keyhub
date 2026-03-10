@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { apiFetch } from "@/lib/fetch"
+import { useOrgs } from "@/contexts/orgs-context"
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -42,13 +43,6 @@ import { ActivityIcon } from "@/components/ui/activity"
 import { ChevronsUpDownIcon } from "@/components/ui/chevrons-up-down"
 import { CheckIcon } from "@/components/ui/check"
 import { PlusIcon } from "@/components/ui/plus"
-
-interface UserOrg {
-  id: string
-  name: string
-  slug: string
-  role: string
-}
 
 const navMain = [
   {
@@ -118,7 +112,7 @@ const navSecondary = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session, update: updateSession } = useSession()
-  const [orgs, setOrgs] = React.useState<UserOrg[]>([])
+  const { orgs } = useOrgs()
   const [activeOrgId, setActiveOrgId] = React.useState<string>(
     session?.activeOrgId || "personal"
   )
@@ -130,14 +124,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN"
-
-  // Fetch user's organizations
-  React.useEffect(() => {
-    fetch("/api/orgs")
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setOrgs(Array.isArray(data) ? data : []))
-      .catch(() => setOrgs([]))
-  }, [])
 
   // Sync with session on mount
   React.useEffect(() => {

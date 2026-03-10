@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -22,6 +22,7 @@ import { UsersIcon } from '@/components/ui/users'
 import { LoaderPinwheelIcon } from '@/components/ui/loader-pinwheel'
 import { ChevronRightIcon } from '@/components/ui/chevron-right'
 import { useAnimatedIcon } from '@/hooks/use-animated-icon'
+import { useOrgs } from '@/contexts/orgs-context'
 
 interface Org {
   id: string
@@ -35,13 +36,14 @@ interface Org {
 
 export default function OrganizationsPage() {
   const { addToast } = useToast()
+  const { refreshOrgs: refreshSidebarOrgs } = useOrgs()
   const [orgs, setOrgs] = useState<Org[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [orgName, setOrgName] = useState('')
   const [creating, setCreating] = useState(false)
 
-  async function fetchOrgs() {
+  const fetchOrgs = useCallback(async () => {
     try {
       const res = await fetch('/api/orgs')
       if (!res.ok) throw new Error('Failed to fetch')
@@ -52,12 +54,11 @@ export default function OrganizationsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [addToast])
 
   useEffect(() => {
     fetchOrgs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fetchOrgs])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -79,6 +80,7 @@ export default function OrganizationsPage() {
       setOrgName('')
       setCreateOpen(false)
       addToast({ title: 'Organization created', variant: 'success' })
+      refreshSidebarOrgs()
     } catch {
       addToast({ title: 'Network error', description: 'Could not reach server', variant: 'destructive' })
     } finally {

@@ -229,7 +229,7 @@ export default function AdminUserDetailPage() {
       }
       addToast({ title: `Now viewing as ${user?.email}`, variant: 'success' })
       // Redirect to dashboard as the impersonated user
-      window.location.href = '/dashboard'
+      router.push('/dashboard')
     } catch (err: unknown) {
       addToast({ title: err instanceof Error ? err.message : 'Operation failed', variant: 'destructive' })
     } finally {

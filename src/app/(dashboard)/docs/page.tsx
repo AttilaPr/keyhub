@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -106,40 +106,57 @@ export default function DocsPage() {
   const { addToast } = useToast()
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/keys/provider')
-        .then((res) => {
-          if (!res.ok) throw new Error('Failed to load providers')
-          return res.json()
-        })
-        .then((keys: { provider: string; isActive: boolean }[]) => {
+    const controller = new AbortController()
+    const { signal } = controller
+
+    async function loadData() {
+      try {
+        const [providerRes, setupRes, modelsRes] = await Promise.all([
+          fetch('/api/keys/provider', { signal }),
+          fetch('/api/setup-status', { signal }),
+          fetch('/api/models', { signal }),
+        ])
+
+        if (providerRes.ok) {
+          const keys: { provider: string; isActive: boolean }[] = await providerRes.json()
           setActiveProviders(new Set(keys.filter((k) => k.isActive).map((k) => k.provider)))
-        }),
-      fetch('/api/setup-status')
-        .then((res) => {
-          if (!res.ok) throw new Error('Failed to load setup status')
-          return res.json()
-        })
-        .then(setSetupStatus),
-      fetch('/api/models')
-        .then((res) => res.ok ? res.json() : null)
-        .then((data: { providers: { key: string; label: string; models: string[] }[] } | null) => {
+        }
+
+        if (setupRes.ok) {
+          setSetupStatus(await setupRes.json())
+        }
+
+        if (modelsRes.ok) {
+          const data: { providers: { key: string; label: string; models: string[] }[] } | null = await modelsRes.json()
           if (data?.providers?.length) {
             setModels(data.providers.map((p) => ({ provider: p.label, key: p.key, models: p.models })))
           }
-        }),
-    ])
-      .catch(() => {
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
         addToast({ title: 'Could not load setup status', description: 'Some sections may be incomplete', variant: 'destructive' })
-      })
-      .finally(() => setSetupLoading(false))
+      } finally {
+        setSetupLoading(false)
+      }
+    }
+
+    loadData()
+    return () => controller.abort()
+  }, [addToast])
+
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+    }
   }, [])
 
   async function copyCode(code: string, index: number) {
     try {
       await navigator.clipboard.writeText(code)
       setCopiedIndex(index)
-      setTimeout(() => setCopiedIndex(null), 2000)
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+      copiedTimerRef.current = setTimeout(() => setCopiedIndex(null), 2000)
     } catch {
       // Clipboard API not available
     }

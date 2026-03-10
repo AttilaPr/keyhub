@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { ShieldIcon } from 'lucide-react'
 import { apiFetch } from '@/lib/fetch'
 
 export default function AdminUnlockPage() {
+  const router = useRouter()
   const [key, setKey] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -31,7 +33,7 @@ export default function AdminUnlockPage() {
         return
       }
 
-      window.location.href = '/admin'
+      router.push('/admin')
     } catch {
       setError('Failed to verify key')
     } finally {

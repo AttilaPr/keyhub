@@ -121,33 +121,47 @@ export default function LogsPage() {
   const { iconRef: errorIconRef, handlers: errorHandlers } = useAnimatedIcon()
 
   useEffect(() => {
-    fetch('/api/keys/platform')
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load keys')
-        return res.json()
-      })
-      .then((data) => setPlatformKeys(data.map((k: { id: string; label: string; keyPrefix: string }) => ({ id: k.id, label: k.label, keyPrefix: k.keyPrefix }))))
-      .catch(() => {
-        addToast({ title: 'Could not load API keys for filter', variant: 'destructive' })
-      })
-    fetch('/api/models')
-      .then((res) => res.ok ? res.json() : null)
-      .then((data: { providers: { key: string; models: string[] }[] } | null) => {
-        if (data?.providers) {
-          const map: Record<string, string[]> = {}
-          for (const p of data.providers) {
-            map[p.key] = p.models.map((m) => m.replace(`${p.key}/`, ''))
-          }
-          setProviderModels(map)
+    const controller = new AbortController()
+    const { signal } = controller
+
+    async function loadFilterData() {
+      try {
+        const [keysRes, modelsRes, usageRes] = await Promise.all([
+          fetch('/api/keys/platform', { signal }),
+          fetch('/api/models', { signal }),
+          fetch('/api/usage?days=365', { signal }),
+        ])
+
+        if (keysRes.ok) {
+          const data: { id: string; label: string; keyPrefix: string }[] = await keysRes.json()
+          setPlatformKeys(data.map((k) => ({ id: k.id, label: k.label, keyPrefix: k.keyPrefix })))
+        } else {
+          addToast({ title: 'Could not load API keys for filter', variant: 'destructive' })
         }
-      })
-      .catch(() => {})
-    fetch('/api/usage?days=365')
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data?.tags) setAvailableTags(data.tags) })
-      .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+
+        if (modelsRes.ok) {
+          const data: { providers: { key: string; models: string[] }[] } | null = await modelsRes.json()
+          if (data?.providers) {
+            const map: Record<string, string[]> = {}
+            for (const p of data.providers) {
+              map[p.key] = p.models.map((m) => m.replace(`${p.key}/`, ''))
+            }
+            setProviderModels(map)
+          }
+        }
+
+        if (usageRes.ok) {
+          const data = await usageRes.json()
+          if (data?.tags) setAvailableTags(data.tags)
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      }
+    }
+
+    loadFilterData()
+    return () => controller.abort()
+  }, [addToast])
 
   // Debounce search input
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -160,10 +174,11 @@ export default function LogsPage() {
     }, 400)
   }, [])
 
-  // Clean up debounce timer on unmount
+  // Clean up timers on unmount
   useEffect(() => {
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
     }
   }, [])
 
@@ -184,11 +199,13 @@ export default function LogsPage() {
       : <span className="ml-1 text-primary"><ArrowDownIcon size={14} /></span>
   }
 
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   async function copyToClipboard(text: string, field: string) {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(field)
-      setTimeout(() => setCopiedField(null), 2000)
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+      copiedTimerRef.current = setTimeout(() => setCopiedField(null), 2000)
     } catch {
       addToast({ title: 'Failed to copy', description: 'Could not access clipboard', variant: 'destructive' })
     }

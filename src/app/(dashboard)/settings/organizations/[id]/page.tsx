@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { apiFetch } from '@/lib/fetch'
 import { useParams, useRouter } from 'next/navigation'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -87,6 +88,7 @@ export default function OrgSettingsPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { addToast } = useToast()
+  const { refreshOrgs: refreshSidebarOrgs } = useOrgs()
 
   const [org, setOrg] = useState<OrgDetail | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -318,6 +320,7 @@ export default function OrgSettingsPage() {
         return
       }
       addToast({ title: 'Organization deleted', variant: 'success' })
+      refreshSidebarOrgs()
       router.push('/settings/organizations')
     } catch {
       addToast({ title: 'Network error', variant: 'destructive' })

@@ -88,14 +88,17 @@ export default function AdminLogsPage() {
         clearInterval(liveRef.current)
         liveRef.current = null
       }
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
     }
   }, [liveMode, fetchLogs])
 
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   async function copyToClipboard(text: string, field: string) {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(field)
-      setTimeout(() => setCopiedField(null), 2000)
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current)
+      copiedTimerRef.current = setTimeout(() => setCopiedField(null), 2000)
     } catch {
       // Clipboard API not available
     }

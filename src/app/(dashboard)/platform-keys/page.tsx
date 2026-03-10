@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -100,7 +101,7 @@ export default function PlatformKeysPage() {
   const [newKeyExpiresAt, setNewKeyExpiresAt] = useState('')
   const [newRawKey, setNewRawKey] = useState('')
   const [saving, setSaving] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const { copy, copied } = useCopyToClipboard()
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -293,11 +294,8 @@ export default function PlatformKeysPage() {
   }
 
   async function copyKey() {
-    try {
-      await navigator.clipboard.writeText(newRawKey)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
+    const ok = await copy(newRawKey)
+    if (!ok) {
       addToast({ title: 'Failed to copy', description: 'Could not access clipboard', variant: 'destructive' })
     }
   }
