@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
+import { apiFetch } from "@/lib/fetch"
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -149,7 +150,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const orgId = value || "personal"
     setActiveOrgId(orgId)
     try {
-      const res = await fetch("/api/orgs/switch", {
+      const res = await apiFetch("/api/orgs/switch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orgId: orgId === "personal" ? null : orgId }),

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { usePathname } from "next/navigation"
 import { Separator } from "@/components/ui/separator"
+import { apiFetch } from "@/lib/fetch"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -186,7 +187,7 @@ export function SiteHeader() {
   async function handleAcknowledge(id: string) {
     setAcknowledgingId(id)
     try {
-      const res = await fetch("/api/anomalies", {
+      const res = await apiFetch("/api/anomalies", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),

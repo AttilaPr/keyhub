@@ -15,6 +15,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
+import { apiFetch } from "@/lib/fetch"
 
 export default function TotpChallengePage() {
   const router = useRouter()
@@ -29,7 +30,7 @@ export default function TotpChallengePage() {
     setLoading(true)
 
     try {
-      const res = await fetch("/api/auth/totp/challenge", {
+      const res = await apiFetch("/api/auth/totp/challenge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

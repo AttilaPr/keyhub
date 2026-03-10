@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
+import { apiFetch } from '@/lib/fetch'
 
 interface Announcement {
   id: string
@@ -52,7 +53,7 @@ export function AnnouncementBanners() {
   async function handleDismiss(announcementId: string) {
     setAnnouncements((prev) => prev.filter((a) => a.id !== announcementId))
     try {
-      await fetch('/api/announcements', {
+      await apiFetch('/api/announcements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'dismiss', announcementId }),
