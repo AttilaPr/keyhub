@@ -37,7 +37,11 @@ export function LoginForm({
     })
 
     if (result?.error) {
-      setError("Invalid email or password")
+      if (result.code === "email_not_verified") {
+        setError("Please verify your email before signing in. Check your inbox for the verification link.")
+      } else {
+        setError("Invalid email or password")
+      }
       setLoading(false)
     } else {
       // Check if TOTP is required by fetching the session

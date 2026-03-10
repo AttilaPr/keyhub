@@ -1,5 +1,9 @@
-import NextAuth from 'next-auth'
+import NextAuth, { CredentialsSignin } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
+
+class EmailNotVerifiedError extends CredentialsSignin {
+  code = 'email_not_verified'
+}
 import bcrypt from 'bcrypt'
 import prisma from '@/lib/prisma'
 import { headers } from 'next/headers'
@@ -61,7 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (user.suspended) return null
 
         // Block unverified email
-        if (!user.emailVerified) return null
+        if (!user.emailVerified) throw new EmailNotVerifiedError()
 
         return {
           id: user.id,
