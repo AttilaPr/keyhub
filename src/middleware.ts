@@ -231,9 +231,10 @@ export async function middleware(req: NextRequest) {
   }
 
   // Handle TOTP challenge page
+  const isTotpApi = pathname === '/api/auth/totp/challenge'
   if (isLoggedIn && token?.requiresTotp) {
     // User is logged in but needs TOTP verification
-    if (isTotpPage) {
+    if (isTotpPage || isTotpApi) {
       // Ensure CSRF cookie is set for the TOTP page so the challenge POST works
       const totpCsrf = req.cookies.get('__keyhub_csrf')?.value
       if (!totpCsrf || isCsrfTokenExpired(totpCsrf)) {
