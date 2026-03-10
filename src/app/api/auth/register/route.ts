@@ -81,6 +81,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'If this email is not registered, a verification email has been sent.' }, { status: 201 })
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('[register] Error:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: 'Internal server error', debug: message }, { status: 500 })
   }
 }
