@@ -1,30 +1,32 @@
 "use client"
 
+import { useMemo } from "react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
-const CODE_EXAMPLES = [
-  {
-    id: "curl",
-    label: "cURL",
-    code: `curl https://your-keyhub.com/api/v1/chat/completions \\
+function buildCodeExamples(host: string) {
+  return [
+    {
+      id: "curl",
+      label: "cURL",
+      code: `curl ${host}/api/v1/chat/completions \\
   -H "Authorization: Bearer pk_your_key" \\
   -H "Content-Type: application/json" \\
   -d '{
     "model": "gpt-4o",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'`,
-  },
-  {
-    id: "python",
-    label: "Python",
-    code: `from openai import OpenAI
+    },
+    {
+      id: "python",
+      label: "Python",
+      code: `from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://your-keyhub.com/api/v1",
+    base_url="${host}/api/v1",
     api_key="pk_your_key",
 )
 
@@ -33,14 +35,14 @@ response = client.chat.completions.create(
     messages=[{"role": "user", "content": "Hello!"}],
 )
 print(response.choices[0].message.content)`,
-  },
-  {
-    id: "node",
-    label: "Node.js",
-    code: `import OpenAI from "openai";
+    },
+    {
+      id: "node",
+      label: "Node.js",
+      code: `import OpenAI from "openai";
 
 const client = new OpenAI({
-  baseURL: "https://your-keyhub.com/api/v1",
+  baseURL: "${host}/api/v1",
   apiKey: "pk_your_key",
 });
 
@@ -49,11 +51,11 @@ const response = await client.chat.completions.create({
   messages: [{ role: "user", content: "Hello!" }],
 });
 console.log(response.choices[0].message.content);`,
-  },
-  {
-    id: "go",
-    label: "Go",
-    code: `package main
+    },
+    {
+      id: "go",
+      label: "Go",
+      code: `package main
 
 import (
   "context"
@@ -63,7 +65,7 @@ import (
 
 func main() {
   config := openai.DefaultConfig("pk_your_key")
-  config.BaseURL = "https://your-keyhub.com/api/v1"
+  config.BaseURL = "${host}/api/v1"
   client := openai.NewClientWithConfig(config)
 
   resp, _ := client.CreateChatCompletion(
@@ -77,15 +79,15 @@ func main() {
   )
   fmt.Println(resp.Choices[0].Message.Content)
 }`,
-  },
-  {
-    id: "ruby",
-    label: "Ruby",
-    code: `require "openai"
+    },
+    {
+      id: "ruby",
+      label: "Ruby",
+      code: `require "openai"
 
 client = OpenAI::Client.new(
   access_token: "pk_your_key",
-  uri_base: "https://your-keyhub.com/api/v1",
+  uri_base: "${host}/api/v1",
 )
 
 response = client.chat(
@@ -95,10 +97,16 @@ response = client.chat(
   },
 )
 puts response.dig("choices", 0, "message", "content")`,
-  },
-] as const
+    },
+  ]
+}
 
 export function HeroSection() {
+  const codeExamples = useMemo(
+    () => buildCodeExamples(typeof window !== "undefined" ? window.location.origin : "https://your-keyhub.com"),
+    [],
+  )
+
   return (
     <section className="py-24 md:py-32 lg:py-40">
       <div className="mx-auto max-w-6xl px-6 lg:px-8 text-center">
@@ -127,7 +135,7 @@ export function HeroSection() {
                 <div className="size-3 rounded-full bg-yellow-500/80" />
                 <div className="size-3 rounded-full bg-green-500/80" />
                 <TabsList className="ml-2 h-auto bg-transparent p-0 gap-0">
-                  {CODE_EXAMPLES.map((ex) => (
+                  {codeExamples.map((ex) => (
                     <TabsTrigger
                       key={ex.id}
                       value={ex.id}
@@ -138,7 +146,7 @@ export function HeroSection() {
                   ))}
                 </TabsList>
               </div>
-              {CODE_EXAMPLES.map((ex) => (
+              {codeExamples.map((ex) => (
                 <TabsContent key={ex.id} value={ex.id}>
                   <pre className="overflow-x-auto p-6 text-left text-sm leading-relaxed">
                     <code className="font-mono text-zinc-300">{ex.code}</code>
