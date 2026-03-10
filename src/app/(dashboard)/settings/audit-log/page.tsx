@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,7 +37,7 @@ const ACTION_TYPES = [
 interface AuditEvent {
   id: string
   userId: string | null
-  actorId: string
+  actorId: string | null
   action: string
   targetType: string | null
   targetId: string | null
@@ -61,7 +61,7 @@ export default function AuditLogPage() {
   const { addToast } = useToast()
   const limit = 20
 
-  async function fetchEvents() {
+  const fetchEvents = useCallback(async () => {
     setLoading(true)
     setError(null)
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
@@ -83,9 +83,9 @@ export default function AuditLogPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, actionFilter, fromDate, toDate])
 
-  useEffect(() => { fetchEvents() }, [page, actionFilter, fromDate, toDate])
+  useEffect(() => { fetchEvents() }, [fetchEvents])
 
   function clearFilters() {
     setActionFilter('all')
@@ -218,7 +218,7 @@ export default function AuditLogPage() {
                       {new Date(event.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm font-mono">
-                      {event.actorId.slice(0, 8)}...
+                      {event.actorId ? `${event.actorId.slice(0, 8)}...` : 'System'}
                     </TableCell>
                     <TableCell>
                       <Badge variant="default" className={actionColor(event.action)}>

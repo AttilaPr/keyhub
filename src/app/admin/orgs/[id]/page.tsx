@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -125,7 +126,7 @@ export default function AdminOrgDetailPage() {
   async function handleSuspend() {
     setSuspending(true)
     try {
-      const res = await fetch(`/api/admin/orgs/${orgId}/suspend`, {
+      const res = await apiFetch(`/api/admin/orgs/${orgId}/suspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -136,8 +137,8 @@ export default function AdminOrgDetailPage() {
       }
       addToast({ title: 'Organization suspended', variant: 'success' })
       fetchOrg()
-    } catch (err: any) {
-      addToast({ title: err.message, variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: err instanceof Error ? err.message : 'Operation failed', variant: 'destructive' })
     } finally {
       setSuspending(false)
     }
@@ -146,7 +147,7 @@ export default function AdminOrgDetailPage() {
   async function handleUnsuspend() {
     setUnsuspending(true)
     try {
-      const res = await fetch(`/api/admin/orgs/${orgId}/unsuspend`, {
+      const res = await apiFetch(`/api/admin/orgs/${orgId}/unsuspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -165,7 +166,7 @@ export default function AdminOrgDetailPage() {
     if (deleteConfirm !== org?.slug) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/admin/orgs/${orgId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/admin/orgs/${orgId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete organization')
       addToast({ title: 'Organization deleted', variant: 'success' })
       router.push('/admin/orgs')
@@ -179,7 +180,7 @@ export default function AdminOrgDetailPage() {
   async function handleRemoveMember(userId: string) {
     setRemovingMember(userId)
     try {
-      const res = await fetch(`/api/admin/orgs/${orgId}/members/${userId}`, {
+      const res = await apiFetch(`/api/admin/orgs/${orgId}/members/${userId}`, {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error('Failed to remove member')

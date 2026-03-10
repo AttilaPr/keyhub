@@ -7,8 +7,8 @@ export async function GET(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const page = parseInt(searchParams.get('page') || '1')
-  const limit = parseInt(searchParams.get('limit') || '50')
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50))
   const provider = searchParams.get('provider')
   const status = searchParams.get('status')
   const model = searchParams.get('model')
@@ -59,16 +59,31 @@ export async function GET(req: Request) {
 
     const whereClause = conditions.join(' AND ')
 
-    // Validate sort field to prevent SQL injection
-    const quotedOrderBy = `"${orderByField}"`
+    // Map allowed sort fields to exact SQL column references (prevents injection)
+    const sortFieldMap: Record<string, string> = {
+      createdAt: '"createdAt"',
+      totalTokens: '"totalTokens"',
+      costUsd: '"costUsd"',
+      latencyMs: '"latencyMs"',
+      provider: '"provider"',
+      model: '"model"',
+      status: '"status"',
+    }
+    const quotedOrderBy = sortFieldMap[orderByField] || '"createdAt"'
     const sqlOrder = sortOrder === 'asc' ? 'ASC' : 'DESC'
 
-    const offset = (page - 1) * limit
+    // Add LIMIT and OFFSET as parameterized values
+    const limitParamIdx = paramIndex
+    params.push(limit)
+    paramIndex++
+    const offsetParamIdx = paramIndex
+    params.push((page - 1) * limit)
+    paramIndex++
 
     // Use tagged template for raw query
     const countResult = await prisma.$queryRawUnsafe<[{ count: bigint }]>(
       `SELECT COUNT(*) as count FROM "RequestLog" r WHERE ${whereClause}`,
-      ...params
+      ...params.slice(0, limitParamIdx - 1) // count query doesn't need LIMIT/OFFSET params
     )
     const total = Number(countResult[0]?.count || 0)
 
@@ -82,7 +97,7 @@ export async function GET(req: Request) {
        LEFT JOIN "PlatformKey" pk ON pk."id" = r."platformKeyId"
        WHERE ${whereClause}
        ORDER BY r.${quotedOrderBy} ${sqlOrder}
-       LIMIT ${limit} OFFSET ${offset}`,
+       LIMIT $${limitParamIdx} OFFSET $${offsetParamIdx}`,
       ...params
     )
 

@@ -11,7 +11,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await req.json()
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
   const { password, code } = body
 
   if (!password || typeof password !== 'string') {
@@ -82,6 +87,16 @@ export async function POST(req: Request) {
       where: { userId: session.user.id },
     }),
   ])
+
+  // Audit log
+  await prisma.auditEvent.create({
+    data: {
+      actorId: session.user.id,
+      action: 'totp.disabled',
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+      userAgent: req.headers.get('user-agent') ?? null,
+    },
+  }).catch(() => {})
 
   return NextResponse.json({ success: true })
 }

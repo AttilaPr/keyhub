@@ -26,5 +26,9 @@ declare module 'next-auth/jwt' {
     originalAdminId?: string    // preserved admin session ID
     originalAdminRole?: string  // preserved admin role
     adminIp?: string            // IP address when admin session was created
+    issuedAt?: number           // JWT issue timestamp
+    lastDbCheck?: number        // last time user data was re-checked from DB
+    lastActivity?: number       // last activity timestamp for session timeout
+    invalidated?: boolean       // whether the session has been invalidated
   }
 }

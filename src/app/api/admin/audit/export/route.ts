@@ -3,7 +3,7 @@ import { requireSuperAdmin } from '@/lib/admin'
 import prisma from '@/lib/prisma'
 
 export async function GET(req: Request) {
-  const session = await requireSuperAdmin()
+  const session = await requireSuperAdmin(req)
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
   // Resolve actor/user names
   const userIds = new Set<string>()
   for (const e of events) {
-    userIds.add(e.actorId)
+    if (e.actorId) userIds.add(e.actorId)
     if (e.userId) userIds.add(e.userId)
   }
 
@@ -74,20 +74,20 @@ export async function GET(req: Request) {
   ]
 
   const rows = events.map((e) => {
-    const actor = userMap[e.actorId]
+    const actor = e.actorId ? userMap[e.actorId] : null
     const target = e.userId ? userMap[e.userId] : null
     return [
       e.createdAt.toISOString(),
-      e.actorId,
+      escapeCsv(e.actorId ?? ''),
       escapeCsv(actor?.email || ''),
-      actor?.role || '',
-      e.action,
-      e.targetType || '',
-      e.targetId || '',
-      e.userId || '',
+      escapeCsv(actor?.role || ''),
+      escapeCsv(e.action),
+      escapeCsv(e.targetType || ''),
+      escapeCsv(e.targetId || ''),
+      escapeCsv(e.userId || ''),
       escapeCsv(target?.email || ''),
       escapeCsv(e.metadata || ''),
-      e.ip || '',
+      escapeCsv(e.ip || ''),
       escapeCsv(e.userAgent || ''),
     ]
   })

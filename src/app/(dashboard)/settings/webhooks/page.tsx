@@ -33,6 +33,7 @@ import { ChevronDownIcon } from '@/components/ui/chevron-down'
 import { ChevronUpIcon } from '@/components/ui/chevron-up'
 import { HistoryIcon } from '@/components/ui/history'
 import { useAnimatedIcon } from '@/hooks/use-animated-icon'
+import { apiFetch } from '@/lib/fetch'
 
 const EVENT_TYPES = [
   { value: 'budget.threshold', label: 'Budget Threshold' },
@@ -137,7 +138,7 @@ export default function WebhooksPage() {
     setSaving(true)
 
     try {
-      const res = await fetch('/api/webhooks', {
+      const res = await apiFetch('/api/webhooks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: newUrl, events: newEvents }),
@@ -165,7 +166,7 @@ export default function WebhooksPage() {
   async function handleToggle(id: string, active: boolean) {
     setTogglingId(id)
     try {
-      const res = await fetch('/api/webhooks', {
+      const res = await apiFetch('/api/webhooks', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, active }),
@@ -185,7 +186,7 @@ export default function WebhooksPage() {
   async function handleTest(id: string) {
     setTestingId(id)
     try {
-      const res = await fetch('/api/webhooks', {
+      const res = await apiFetch('/api/webhooks', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, test: true }),
@@ -206,7 +207,7 @@ export default function WebhooksPage() {
     if (!deleteId) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/webhooks?id=${deleteId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/webhooks?id=${deleteId}`, { method: 'DELETE' })
       if (res.ok) {
         addToast({ title: 'Webhook deleted', variant: 'default' })
         setDeleteId(null)
@@ -341,6 +342,7 @@ export default function WebhooksPage() {
                 <button
                   type="button"
                   onClick={() => toggleDeliveryHistory(endpoint.id)}
+                  aria-expanded={expandedEndpoint === endpoint.id}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-muted-foreground transition-colors"
                 >
                   <HistoryIcon size={12} />

@@ -1,3 +1,16 @@
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function baseUrl(): string {
+  return process.env.NEXTAUTH_URL || 'http://localhost:3000'
+}
+
 function layout(content: string): string {
   return `<!DOCTYPE html>
 <html>
@@ -29,9 +42,7 @@ function layout(content: string): string {
                 You received this email because of your KeyHub account settings.
               </p>
               <p style="margin:8px 0 0;font-size:12px;">
-                <a href="{{unsubscribe_url}}" style="color:#71717a;text-decoration:underline;">Unsubscribe</a>
-                &nbsp;&middot;&nbsp;
-                <a href="{{settings_url}}" style="color:#71717a;text-decoration:underline;">Notification settings</a>
+                <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/settings" style="color:#71717a;text-decoration:underline;">Notification settings</a>
               </p>
             </td>
           </tr>
@@ -47,9 +58,26 @@ function button(text: string, href: string): string {
   return `<a href="${href}" style="display:inline-block;padding:10px 24px;background-color:#84cc16;color:#0a0a0a;font-size:14px;font-weight:600;text-decoration:none;border-radius:6px;">${text}</a>`
 }
 
+export function emailVerificationEmail(name: string, verifyUrl: string): string {
+  return layout(`
+    <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#fafafa;">Verify your email</h1>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#a1a1aa;">
+      Hi ${escapeHtml(name || 'there')}, thanks for signing up for KeyHub! Please verify your email address
+      by clicking the button below.
+    </p>
+    <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#a1a1aa;">
+      This link expires in 24 hours.
+    </p>
+    ${button('Verify Email', verifyUrl)}
+    <p style="margin:16px 0 0;font-size:12px;color:#52525b;">
+      If you didn&rsquo;t create a KeyHub account, you can safely ignore this email.
+    </p>
+  `)
+}
+
 export function welcomeEmail(name: string): string {
   return layout(`
-    <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#fafafa;">Welcome to KeyHub, ${name}!</h1>
+    <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#fafafa;">Welcome to KeyHub, ${escapeHtml(name)}!</h1>
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#a1a1aa;">
       Your account is ready. KeyHub gives you a single API gateway for all your AI providers &mdash;
       manage keys, track costs, and monitor usage from one dashboard.
@@ -62,7 +90,7 @@ export function welcomeEmail(name: string): string {
       <li>Generate a platform key to use as your unified API key</li>
       <li>Point your code to KeyHub&rsquo;s endpoint and start making requests</li>
     </ol>
-    ${button('Go to Dashboard', '{{dashboard_url}}')}
+    ${button('Go to Dashboard', `${baseUrl()}/dashboard`)}
   `)
 }
 
@@ -73,10 +101,10 @@ export function orgInviteEmail(
   expiryDate: string,
 ): string {
   return layout(`
-    <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#fafafa;">You&rsquo;re invited to join ${orgName}</h1>
+    <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#fafafa;">You&rsquo;re invited to join ${escapeHtml(orgName)}</h1>
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#a1a1aa;">
-      <strong style="color:#e4e4e7;">${inviterName}</strong> has invited you to join
-      <strong style="color:#e4e4e7;">${orgName}</strong> on KeyHub.
+      <strong style="color:#e4e4e7;">${escapeHtml(inviterName)}</strong> has invited you to join
+      <strong style="color:#e4e4e7;">${escapeHtml(orgName)}</strong> on KeyHub.
     </p>
     <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#a1a1aa;">
       This invitation expires on <strong style="color:#e4e4e7;">${expiryDate}</strong>.
@@ -208,7 +236,7 @@ export function keyRotationReminderEmail(
       Regular key rotation reduces the risk of unauthorized access from leaked or compromised keys.
       Visit your Provider Keys page to update this key.
     </p>
-    ${button('Rotate Key', '{{provider_keys_url}}')}
+    ${button('Rotate Key', `${baseUrl()}/provider-keys`)}
   `)
 }
 
@@ -226,6 +254,6 @@ export function keyExpiryWarningEmail(
       Once expired, all API requests using this key will be rejected with a 403 error.
       Generate a new key or extend the expiration date to avoid service disruption.
     </p>
-    ${button('Manage Keys', '{{platform_keys_url}}')}
+    ${button('Manage Keys', `${baseUrl()}/platform-keys`)}
   `)
 }

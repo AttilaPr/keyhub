@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -91,7 +92,7 @@ export default function AdminFlagsPage() {
   async function handleToggle(key: string, enabled: boolean) {
     setToggling(key)
     try {
-      const res = await fetch(`/api/admin/flags/${key}`, {
+      const res = await apiFetch(`/api/admin/flags/${key}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
@@ -116,7 +117,7 @@ export default function AdminFlagsPage() {
     }
     setSaving(key)
     try {
-      const res = await fetch(`/api/admin/flags/${key}`, {
+      const res = await apiFetch(`/api/admin/flags/${key}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rolloutPercent: percent }),
@@ -141,7 +142,7 @@ export default function AdminFlagsPage() {
       .filter(Boolean)
     setSaving(key)
     try {
-      const res = await fetch(`/api/admin/flags/${key}`, {
+      const res = await apiFetch(`/api/admin/flags/${key}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ allowedUserIds: userIds }),
@@ -163,7 +164,7 @@ export default function AdminFlagsPage() {
     if (!newKey.trim()) return
     setCreating(true)
     try {
-      const res = await fetch('/api/admin/flags', {
+      const res = await apiFetch('/api/admin/flags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: newKey.trim(), description: newDescription.trim() || undefined }),
@@ -190,7 +191,7 @@ export default function AdminFlagsPage() {
   async function handleDelete(key: string) {
     setDeleting(key)
     try {
-      const res = await fetch(`/api/admin/flags/${key}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/admin/flags/${key}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete flag')
       setFlags((prev) => prev.filter((f) => f.key !== key))
       addToast({ title: `Flag "${key}" deleted`, variant: 'success' })
@@ -204,7 +205,7 @@ export default function AdminFlagsPage() {
   async function handleSeed() {
     setSeeding(true)
     try {
-      const res = await fetch('/api/admin/flags/seed', { method: 'POST' })
+      const res = await apiFetch('/api/admin/flags/seed', { method: 'POST' })
       if (!res.ok) throw new Error('Failed to seed flags')
       const data = await res.json()
       addToast({

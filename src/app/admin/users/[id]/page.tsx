@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -139,7 +140,7 @@ export default function AdminUserDetailPage() {
     }
     setSuspending(true)
     try {
-      const res = await fetch(`/api/admin/users/${userId}/suspend`, {
+      const res = await apiFetch(`/api/admin/users/${userId}/suspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: suspendReason.trim() }),
@@ -152,8 +153,8 @@ export default function AdminUserDetailPage() {
       setSuspendDialogOpen(false)
       setSuspendReason('')
       fetchUser()
-    } catch (err: any) {
-      addToast({ title: err.message, variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: err instanceof Error ? err.message : 'Operation failed', variant: 'destructive' })
     } finally {
       setSuspending(false)
     }
@@ -162,7 +163,7 @@ export default function AdminUserDetailPage() {
   async function handleUnsuspend() {
     setUnsuspending(true)
     try {
-      const res = await fetch(`/api/admin/users/${userId}/unsuspend`, {
+      const res = await apiFetch(`/api/admin/users/${userId}/unsuspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -180,7 +181,7 @@ export default function AdminUserDetailPage() {
   async function handleForceLogout() {
     setLoggingOut(true)
     try {
-      const res = await fetch(`/api/admin/users/${userId}/force-logout`, {
+      const res = await apiFetch(`/api/admin/users/${userId}/force-logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -198,7 +199,7 @@ export default function AdminUserDetailPage() {
   async function handleResetPassword() {
     setResettingPassword(true)
     try {
-      const res = await fetch(`/api/admin/users/${userId}/reset-password`, {
+      const res = await apiFetch(`/api/admin/users/${userId}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
@@ -208,8 +209,8 @@ export default function AdminUserDetailPage() {
       }
       const data = await res.json()
       addToast({ title: data.message || 'Password reset email sent', variant: 'success' })
-    } catch (err: any) {
-      addToast({ title: err.message, variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: err instanceof Error ? err.message : 'Operation failed', variant: 'destructive' })
     } finally {
       setResettingPassword(false)
     }
@@ -218,7 +219,7 @@ export default function AdminUserDetailPage() {
   async function handleImpersonate() {
     setImpersonating(true)
     try {
-      const res = await fetch(`/api/admin/impersonate/${userId}`, {
+      const res = await apiFetch(`/api/admin/impersonate/${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
@@ -229,8 +230,8 @@ export default function AdminUserDetailPage() {
       addToast({ title: `Now viewing as ${user?.email}`, variant: 'success' })
       // Redirect to dashboard as the impersonated user
       window.location.href = '/dashboard'
-    } catch (err: any) {
-      addToast({ title: err.message, variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: err instanceof Error ? err.message : 'Operation failed', variant: 'destructive' })
     } finally {
       setImpersonating(false)
     }

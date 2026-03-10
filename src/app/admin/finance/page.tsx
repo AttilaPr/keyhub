@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,7 +58,7 @@ interface CreditTransaction {
   userId: string
   amount: number
   reason: string
-  adminId: string
+  adminId: string | null
   adminEmail: string
   createdAt: string
   user: { id: string; email: string; name: string | null }
@@ -190,7 +191,7 @@ export default function AdminFinancePage() {
 
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/admin/finance/credits/${creditUserId.trim()}`, {
+      const res = await apiFetch(`/api/admin/finance/credits/${creditUserId.trim()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -234,7 +235,7 @@ export default function AdminFinancePage() {
 
     setPricingSubmitting(true)
     try {
-      const res = await fetch(`/api/admin/finance/override-pricing/${pricingUserId.trim()}`, {
+      const res = await apiFetch(`/api/admin/finance/override-pricing/${pricingUserId.trim()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ multiplier }),

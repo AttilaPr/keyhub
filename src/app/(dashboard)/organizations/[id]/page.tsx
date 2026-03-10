@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -152,7 +153,7 @@ export default function OrganizationDetailPage() {
     if (!editName.trim()) return
     setSavingName(true)
     try {
-      const res = await fetch(`/api/orgs/${orgId}`, {
+      const res = await apiFetch(`/api/orgs/${orgId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editName }),
@@ -175,7 +176,7 @@ export default function OrganizationDetailPage() {
     e.preventDefault()
     setSendingInvite(true)
     try {
-      const res = await fetch(`/api/orgs/${orgId}/invites`, {
+      const res = await apiFetch(`/api/orgs/${orgId}/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
@@ -202,7 +203,7 @@ export default function OrganizationDetailPage() {
 
   async function handleRoleChange(userId: string, newRole: string) {
     try {
-      const res = await fetch(`/api/orgs/${orgId}/members/${userId}`, {
+      const res = await apiFetch(`/api/orgs/${orgId}/members/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
@@ -223,7 +224,7 @@ export default function OrganizationDetailPage() {
     if (!removeMember) return
     setRemoving(true)
     try {
-      const res = await fetch(`/api/orgs/${orgId}/members`, {
+      const res = await apiFetch(`/api/orgs/${orgId}/members`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: removeMember.userId }),
@@ -246,7 +247,7 @@ export default function OrganizationDetailPage() {
 
   async function handleRevokeInvite(inviteId: string) {
     try {
-      const res = await fetch(`/api/orgs/${orgId}/invites`, {
+      const res = await apiFetch(`/api/orgs/${orgId}/invites`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteId }),
@@ -266,7 +267,7 @@ export default function OrganizationDetailPage() {
   async function handleDeleteOrg() {
     setDeletingOrg(true)
     try {
-      const res = await fetch(`/api/orgs/${orgId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/orgs/${orgId}`, { method: 'DELETE' })
       if (res.ok) {
         addToast({ title: 'Organization deleted', variant: 'success' })
         router.push('/organizations')

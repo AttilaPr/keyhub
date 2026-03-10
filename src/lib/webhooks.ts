@@ -83,8 +83,8 @@ async function attemptDelivery(
     statusCode = res.status
     responseBody = await res.text().catch(() => null)
     delivered = res.ok
-  } catch (err: any) {
-    responseBody = err.message
+  } catch (err: unknown) {
+    responseBody = err instanceof Error ? err.message : 'Unknown error'
   }
 
   return { statusCode, responseBody, delivered }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -123,7 +124,7 @@ export default function AdminPlansPage() {
     if (!formData.name?.trim()) return
     setCreating(true)
     try {
-      const res = await fetch('/api/admin/plans', {
+      const res = await apiFetch('/api/admin/plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -157,7 +158,7 @@ export default function AdminPlansPage() {
     if (!editingPlan) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/plans/${editingPlan.id}`, {
+      const res = await apiFetch(`/api/admin/plans/${editingPlan.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -190,7 +191,7 @@ export default function AdminPlansPage() {
   async function handleDelete(id: string) {
     setDeleting(id)
     try {
-      const res = await fetch(`/api/admin/plans/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/admin/plans/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Failed to delete plan')
@@ -208,7 +209,7 @@ export default function AdminPlansPage() {
   async function handleSeed() {
     setSeeding(true)
     try {
-      const res = await fetch('/api/admin/plans/seed', { method: 'POST' })
+      const res = await apiFetch('/api/admin/plans/seed', { method: 'POST' })
       if (!res.ok) throw new Error('Failed to seed plans')
       const data = await res.json()
       addToast({

@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma'
 
 interface AuditLogParams {
-  actorId: string
+  actorId: string | null
   userId?: string
   action: string
   targetType?: string

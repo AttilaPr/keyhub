@@ -14,7 +14,7 @@ export async function POST(
   const { id } = await params
 
   const log = await prisma.requestLog.findUnique({
-    where: { id },
+    where: { id, userId: session.user.id },
     select: {
       id: true,
       userId: true,
@@ -45,10 +45,6 @@ export async function POST(
 
   if (!log) {
     return NextResponse.json({ error: 'Log not found' }, { status: 404 })
-  }
-
-  if (log.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   // Parse the prompt (stored as JSON string of messages array)

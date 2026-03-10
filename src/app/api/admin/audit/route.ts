@@ -3,12 +3,12 @@ import { requireSuperAdmin } from '@/lib/admin'
 import prisma from '@/lib/prisma'
 
 export async function GET(req: Request) {
-  const session = await requireSuperAdmin()
+  const session = await requireSuperAdmin(req)
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
-  const page = parseInt(searchParams.get('page') || '1', 10)
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100)
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50))
   const actorId = searchParams.get('actorId')
   const userId = searchParams.get('userId')
   const action = searchParams.get('action')
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
   // Collect all unique actor and user IDs to resolve names
   const userIds = new Set<string>()
   for (const e of events) {
-    userIds.add(e.actorId)
+    if (e.actorId) userIds.add(e.actorId)
     if (e.userId) userIds.add(e.userId)
   }
 
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
 
   const enrichedEvents = events.map((e) => ({
     ...e,
-    actor: userMap[e.actorId] || null,
+    actor: e.actorId ? userMap[e.actorId] || null : null,
     targetUser: e.userId ? userMap[e.userId] || null : null,
   }))
 

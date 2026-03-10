@@ -24,6 +24,7 @@ import { RotateCWIcon } from '@/components/ui/rotate-cw'
 import { TimerIcon } from '@/components/ui/timer'
 import { useAnimatedIcon } from '@/hooks/use-animated-icon'
 import { formatCurrency } from '@/lib/utils'
+import { apiFetch } from '@/lib/fetch'
 
 const PROVIDERS = [
   { value: 'openai', label: 'OpenAI' },
@@ -299,7 +300,7 @@ export default function ProviderKeysPage() {
     e.preventDefault()
     setSaving(true)
 
-    const res = await fetch('/api/keys/provider', {
+    const res = await apiFetch('/api/keys/provider', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider, label, apiKey }),
@@ -322,7 +323,7 @@ export default function ProviderKeysPage() {
   async function handleToggle(id: string, isActive: boolean) {
     setTogglingId(id)
     try {
-      const res = await fetch('/api/keys/provider', {
+      const res = await apiFetch('/api/keys/provider', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, isActive }),
@@ -342,7 +343,7 @@ export default function ProviderKeysPage() {
   async function handleTest(id: string) {
     setTestingId(id)
     try {
-      const res = await fetch('/api/keys/provider/test', {
+      const res = await apiFetch('/api/keys/provider/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -375,7 +376,7 @@ export default function ProviderKeysPage() {
     if (!deleteId) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/keys/provider?id=${deleteId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/keys/provider?id=${deleteId}`, { method: 'DELETE' })
       if (res.ok) {
         addToast({ title: 'Key deleted', variant: 'default' })
         setDeleteId(null)
@@ -394,7 +395,7 @@ export default function ProviderKeysPage() {
   async function handleRotationToggle(id: string, enabled: boolean, currentDays: number | null) {
     setRotationSaving(id)
     try {
-      const res = await fetch('/api/keys/provider', {
+      const res = await apiFetch('/api/keys/provider', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -421,7 +422,7 @@ export default function ProviderKeysPage() {
     if (isNaN(parsed) || parsed < 1) return
     setRotationSaving(id)
     try {
-      const res = await fetch('/api/keys/provider', {
+      const res = await apiFetch('/api/keys/provider', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, rotationReminderDays: parsed }),
@@ -440,7 +441,7 @@ export default function ProviderKeysPage() {
     const parsed = parseInt(weightVal, 10)
     if (isNaN(parsed) || parsed < 1 || parsed > 10) return
     try {
-      const res = await fetch('/api/keys/provider', {
+      const res = await apiFetch('/api/keys/provider', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, weight: parsed }),

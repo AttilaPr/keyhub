@@ -11,8 +11,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { code } = body
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const { code, password } = body
 
   if (!code || typeof code !== 'string' || code.length !== 6) {
     return NextResponse.json(
@@ -21,13 +26,29 @@ export async function POST(req: Request) {
     )
   }
 
+  if (!password || typeof password !== 'string') {
+    return NextResponse.json(
+      { error: 'Password is required to enable MFA' },
+      { status: 400 }
+    )
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { totpSecret: true, totpEnabled: true },
+    select: { totpSecret: true, totpEnabled: true, passwordHash: true },
   })
 
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
+
+  // Verify password before enabling TOTP
+  const passwordMatch = await bcrypt.compare(password, user.passwordHash)
+  if (!passwordMatch) {
+    return NextResponse.json(
+      { error: 'Invalid password' },
+      { status: 403 }
+    )
   }
 
   if (user.totpEnabled) {
@@ -82,6 +103,16 @@ export async function POST(req: Request) {
       data: hashedCodes,
     }),
   ])
+
+  // Audit log
+  await prisma.auditEvent.create({
+    data: {
+      actorId: session.user.id,
+      action: 'totp.enabled',
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+      userAgent: req.headers.get('user-agent') ?? null,
+    },
+  }).catch(() => {})
 
   return NextResponse.json({
     backupCodes: plainCodes,

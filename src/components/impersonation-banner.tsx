@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Button } from '@/components/ui/button'
 import { LogoutIcon } from '@/components/ui/logout'
 import { BadgeAlertIcon } from '@/components/ui/badge-alert'
@@ -38,7 +39,7 @@ export function ImpersonationBanner() {
   async function handleExit() {
     setExiting(true)
     try {
-      const res = await fetch('/api/admin/impersonate/exit', {
+      const res = await apiFetch('/api/admin/impersonate/exit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -93,7 +94,7 @@ export default function SystemConfigPage() {
 
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/system/config', {
+      const res = await apiFetch('/api/admin/system/config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(changes),
@@ -106,10 +107,10 @@ export default function SystemConfigPage() {
       setConfig(data)
       setOriginal(data)
       addToast({ title: 'Configuration saved', variant: 'success' })
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast({
         title: 'Failed to save configuration',
-        description: err.message || 'An unexpected error occurred',
+        description: err instanceof Error ? err.message : 'An unexpected error occurred',
         variant: 'destructive',
       })
     } finally {

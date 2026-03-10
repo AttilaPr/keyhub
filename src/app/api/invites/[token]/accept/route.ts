@@ -11,39 +11,48 @@ export async function POST(
 
   const { token } = await params
 
-  const invite = await prisma.organizationInvite.findUnique({
-    where: { token },
-  })
+  try {
+    const membership = await prisma.$transaction(async (tx) => {
+      const invite = await tx.organizationInvite.findUnique({
+        where: { token },
+      })
 
-  if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 })
-  if (invite.usedAt) return NextResponse.json({ error: 'Invite already used' }, { status: 410 })
-  if (invite.expiresAt < new Date()) return NextResponse.json({ error: 'Invite expired' }, { status: 410 })
+      if (!invite) throw new Error('Invite not found')
+      if (invite.usedAt) throw new Error('Invite already used')
+      if (invite.expiresAt < new Date()) throw new Error('Invite expired')
+      if (invite.email.toLowerCase() !== session.user.email?.toLowerCase()) throw new Error('This invite was sent to a different email address')
 
-  // Check if already a member
-  const existingMember = await prisma.organizationMember.findUnique({
-    where: { orgId_userId: { orgId: invite.orgId, userId: session.user.id } },
-  })
-  if (existingMember) {
-    return NextResponse.json({ error: 'You are already a member of this organization' }, { status: 409 })
+      const existingMember = await tx.organizationMember.findUnique({
+        where: { orgId_userId: { orgId: invite.orgId, userId: session.user.id } },
+      })
+      if (existingMember) throw new Error('You are already a member of this organization')
+
+      const member = await tx.organizationMember.create({
+        data: {
+          orgId: invite.orgId,
+          userId: session.user.id,
+          role: invite.role,
+        },
+      })
+
+      await tx.organizationInvite.update({
+        where: { id: invite.id },
+        data: { usedAt: new Date() },
+      })
+
+      return member
+    })
+
+    return NextResponse.json({
+      orgId: membership.orgId,
+      role: membership.role,
+    }, { status: 201 })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to accept invite'
+    const status = msg.includes('not found') ? 404
+      : msg.includes('already') ? 409
+      : msg.includes('expired') || msg.includes('used') ? 410
+      : 400
+    return NextResponse.json({ error: msg }, { status })
   }
-
-  // Create membership and mark invite as used in a transaction
-  const [membership] = await prisma.$transaction([
-    prisma.organizationMember.create({
-      data: {
-        orgId: invite.orgId,
-        userId: session.user.id,
-        role: invite.role,
-      },
-    }),
-    prisma.organizationInvite.update({
-      where: { id: invite.id },
-      data: { usedAt: new Date() },
-    }),
-  ])
-
-  return NextResponse.json({
-    orgId: membership.orgId,
-    role: membership.role,
-  }, { status: 201 })
 }

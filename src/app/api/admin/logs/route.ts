@@ -3,12 +3,12 @@ import { requireSuperAdmin } from '@/lib/admin'
 import prisma from '@/lib/prisma'
 
 export async function GET(req: Request) {
-  const session = await requireSuperAdmin()
+  const session = await requireSuperAdmin(req)
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
-  const page = parseInt(searchParams.get('page') || '1', 10)
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100)
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50))
   const provider = searchParams.get('provider')
   const status = searchParams.get('status')
   const userId = searchParams.get('userId')

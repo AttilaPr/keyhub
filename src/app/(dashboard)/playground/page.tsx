@@ -21,6 +21,7 @@ import { ChevronUpIcon } from '@/components/ui/chevron-up'
 import { DownloadIcon } from '@/components/ui/download'
 import { FileTextIcon } from '@/components/ui/file-text'
 import { FolderOpenIcon } from '@/components/ui/folder-open'
+import { apiFetch } from '@/lib/fetch'
 
 interface Message {
   role: 'user' | 'assistant' | 'system'
@@ -178,8 +179,9 @@ export default function PlaygroundPage() {
       requestBody.maxTokens = parseInt(maxTokens, 10)
     }
 
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
     try {
-      const res = await fetch('/api/playground/chat', {
+      const res = await apiFetch('/api/playground/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
@@ -193,7 +195,7 @@ export default function PlaygroundPage() {
         return
       }
 
-      const reader = res.body?.getReader()
+      reader = res.body?.getReader()
       if (!reader) {
         setStreaming(false)
         return
@@ -221,11 +223,12 @@ export default function PlaygroundPage() {
           response: assistantContent,
         }])
       }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        addToast({ title: 'Error', description: err.message || 'Failed to send message', variant: 'destructive' })
+    } catch (err: unknown) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        addToast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to send message', variant: 'destructive' })
       }
     } finally {
+      reader?.cancel().catch(() => {})
       setStreaming(false)
       abortRef.current = null
     }
@@ -554,6 +557,7 @@ export default function PlaygroundPage() {
               <button
                 type="button"
                 onClick={() => setExpandedRaw(expandedRaw === i ? null : i)}
+                aria-expanded={expandedRaw === i}
                 className="w-full flex items-center justify-between p-3 text-left text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
               >
                 <span>Exchange #{i + 1}</span>

@@ -15,6 +15,7 @@ import { PlusIcon } from '@/components/ui/plus'
 import { UsersIcon } from '@/components/ui/users'
 import { LoaderPinwheelIcon } from '@/components/ui/loader-pinwheel'
 import { ArrowRightIcon } from '@/components/ui/arrow-right'
+import { apiFetch } from '@/lib/fetch'
 
 interface Org {
   id: string
@@ -37,6 +38,7 @@ export default function OrganizationsPage() {
   async function fetchOrgs() {
     try {
       const res = await fetch('/api/orgs')
+      if (!res.ok) throw new Error('Failed to load')
       const data = await res.json()
       setOrgs(data)
     } catch {
@@ -53,7 +55,7 @@ export default function OrganizationsPage() {
     setSaving(true)
 
     try {
-      const res = await fetch('/api/orgs', {
+      const res = await apiFetch('/api/orgs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName }),

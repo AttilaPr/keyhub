@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -152,7 +153,7 @@ export default function AdminAnnouncementsPage() {
         : '/api/admin/announcements'
       const method = editingId ? 'PATCH' : 'POST'
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -183,7 +184,7 @@ export default function AdminAnnouncementsPage() {
   async function handleDelete(id: string) {
     setDeleting(id)
     try {
-      const res = await fetch(`/api/admin/announcements/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/admin/announcements/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
       addToast({ title: 'Announcement deleted', variant: 'success' })
       fetchAnnouncements()

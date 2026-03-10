@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
-import { calculateCost, MODEL_PRICING } from '@/lib/cost-calculator'
+import { calculateCost, ensurePricingLoaded, getModelPricing, getModelProvider } from '@/lib/cost-calculator'
 
 export async function GET(req: Request) {
   const session = await auth()
@@ -37,18 +37,26 @@ export async function GET(req: Request) {
     })
   }
 
+  await ensurePricingLoaded()
+  const MODEL_PRICING = getModelPricing()
+
   // Find all models we know pricing for, grouped by provider
   const providerCheapestModel: Record<string, { model: string; avgCostPer1MInput: number; avgCostPer1MOutput: number }> = {}
 
   // Map known models to providers
   const knownProviderModels: Record<string, { model: string; input: number; output: number }[]> = {}
   for (const [model, pricing] of Object.entries(MODEL_PRICING)) {
-    // Determine provider from model name patterns
-    let provider = 'unknown'
-    if (model.startsWith('gpt-') || model.startsWith('o1')) provider = 'openai'
-    else if (model.startsWith('claude-')) provider = 'anthropic'
-    else if (model.startsWith('gemini-')) provider = 'google'
-    else if (model.startsWith('mistral-') || model.startsWith('codestral-')) provider = 'mistral'
+    // Determine provider from LiteLLM data or model name patterns
+    let provider = getModelProvider(model) || 'unknown'
+    if (provider === 'unknown') {
+      if (model.startsWith('gpt-') || model.startsWith('o1')) provider = 'openai'
+      else if (model.startsWith('claude-')) provider = 'anthropic'
+      else if (model.startsWith('gemini-')) provider = 'google'
+      else if (model.startsWith('mistral-') || model.startsWith('codestral-')) provider = 'mistral'
+    }
+
+    // Skip prefixed keys (e.g. "openai/gpt-4o") to avoid duplicates
+    if (model.includes('/')) continue
 
     if (!knownProviderModels[provider]) knownProviderModels[provider] = []
     knownProviderModels[provider].push({ model, ...pricing })

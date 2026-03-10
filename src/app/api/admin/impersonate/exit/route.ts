@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   }
 
   // Restore admin session
-  const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET
+  const secret = process.env.NEXTAUTH_SECRET
   if (!secret) {
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
   }
@@ -40,6 +40,12 @@ export async function POST(req: Request) {
     ? '__Secure-authjs.session-token'
     : 'authjs.session-token'
 
+  // Capture admin IP for session binding
+  const forwarded = req.headers.get('x-forwarded-for')
+  const adminIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1'
+
+  const sessionMaxAge = 30 * 60 // 30 minutes (matches normal session duration)
+
   const token = await encode({
     token: {
       id: admin.id,
@@ -47,10 +53,12 @@ export async function POST(req: Request) {
       name: admin.name,
       role: admin.role,
       issuedAt: Date.now(),
+      adminIp,
+      lastActivity: Date.now(),
     },
     secret,
     salt: cookieName,
-    maxAge: 24 * 60 * 60,
+    maxAge: sessionMaxAge,
   } as Parameters<typeof encode>[0])
 
   cookieStore.set(cookieName, token, {
@@ -58,7 +66,7 @@ export async function POST(req: Request) {
     secure: isSecure,
     sameSite: 'lax',
     path: '/',
-    maxAge: 24 * 60 * 60,
+    maxAge: sessionMaxAge,
   })
 
   const meta = getRequestMeta(req)

@@ -5,15 +5,19 @@ import { logAuditEvent, getRequestMeta } from '@/lib/audit'
 import { dispatchWebhook } from '@/lib/webhooks'
 import { encode } from 'next-auth/jwt'
 import { cookies } from 'next/headers'
+import { decryptKey } from '@/lib/encryption'
+import { verifyTotpCode } from '@/lib/totp'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const session = await requireSuperAdmin()
+  const session = await requireSuperAdmin(req)
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { userId } = await params
+  const body = await req.json().catch(() => ({}))
 
   // Cannot impersonate yourself
   if (userId === session.user.id) {
@@ -26,6 +30,51 @@ export async function POST(
       { error: 'Already impersonating. Exit current impersonation first.' },
       { status: 400 }
     )
+  }
+
+  // Enforce TOTP if admin has it enabled
+  const admin = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { totpEnabled: true, totpSecret: true },
+  })
+  if (admin?.totpEnabled) {
+    const { totpCode } = body
+    if (!totpCode || typeof totpCode !== 'string' || !/^\d{6}$/.test(totpCode)) {
+      return NextResponse.json(
+        { error: 'TOTP code required for impersonation' },
+        { status: 400 }
+      )
+    }
+    if (!admin.totpSecret) {
+      return NextResponse.json({ error: 'TOTP configuration error' }, { status: 500 })
+    }
+
+    // Rate limit TOTP attempts for impersonation (check only — don't increment on every attempt)
+    const totpRl = await checkRateLimit(`totp_impersonate:${session.user.id}`, {
+      maxAttempts: 5,
+      windowMs: 15 * 60 * 1000,
+      blockDurationMs: 30 * 60 * 1000,
+      checkOnly: true,
+    })
+    if (!totpRl.allowed) {
+      return NextResponse.json({ error: 'Too many TOTP attempts. Try again later.' }, { status: 429 })
+    }
+
+    try {
+      const secret = decryptKey(admin.totpSecret)
+      if (!verifyTotpCode(secret, totpCode)) {
+        // Increment rate limit only on failed TOTP attempt
+        await checkRateLimit(`totp_impersonate:${session.user.id}`, {
+          maxAttempts: 5,
+          windowMs: 15 * 60 * 1000,
+          blockDurationMs: 30 * 60 * 1000,
+        }).catch(() => {})
+        return NextResponse.json({ error: 'Invalid TOTP code' }, { status: 403 })
+      }
+    } catch (err) {
+      console.error('[impersonate] TOTP verification failed:', err)
+      return NextResponse.json({ error: 'TOTP verification failed' }, { status: 500 })
+    }
   }
 
   const targetUser = await prisma.user.findUnique({
@@ -42,7 +91,7 @@ export async function POST(
   }
 
   // Create impersonation JWT
-  const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET
+  const secret = process.env.NEXTAUTH_SECRET
   if (!secret) {
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
   }

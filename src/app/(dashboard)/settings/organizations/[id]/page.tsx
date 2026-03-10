@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -185,7 +186,7 @@ export default function OrgSettingsPage() {
         setSavingRename(false)
         return
       }
-      const res = await fetch(`/api/orgs/${id}`, {
+      const res = await apiFetch(`/api/orgs/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -210,7 +211,7 @@ export default function OrgSettingsPage() {
   async function handleRoleChange(userId: string, newRole: string) {
     setChangingRole(userId)
     try {
-      const res = await fetch(`/api/orgs/${id}/members/${userId}`, {
+      const res = await apiFetch(`/api/orgs/${id}/members/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
@@ -234,7 +235,7 @@ export default function OrgSettingsPage() {
   async function handleRemoveMember(userId: string) {
     setRemovingMember(userId)
     try {
-      const res = await fetch(`/api/orgs/${id}/members/${userId}`, {
+      const res = await apiFetch(`/api/orgs/${id}/members/${userId}`, {
         method: 'DELETE',
       })
       if (!res.ok) {
@@ -257,7 +258,7 @@ export default function OrgSettingsPage() {
     if (!inviteEmail.trim()) return
     setInviting(true)
     try {
-      const res = await fetch(`/api/orgs/${id}/invites`, {
+      const res = await apiFetch(`/api/orgs/${id}/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
@@ -283,7 +284,7 @@ export default function OrgSettingsPage() {
   async function handleRevokeInvite(inviteId: string) {
     setRevokingInvite(inviteId)
     try {
-      const res = await fetch(`/api/orgs/${id}/invites`, {
+      const res = await apiFetch(`/api/orgs/${id}/invites`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteId }),
@@ -309,7 +310,7 @@ export default function OrgSettingsPage() {
     }
     setDeleting(true)
     try {
-      const res = await fetch(`/api/orgs/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/orgs/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         addToast({ title: 'Error', description: data.error || 'Failed to delete', variant: 'destructive' })

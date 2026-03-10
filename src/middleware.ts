@@ -30,12 +30,41 @@ function isAdminIpAllowed(ip: string): boolean {
   return entries.some((entry) => isIpInCidr(ip, entry))
 }
 
+const CSRF_MAX_AGE_SECONDS = 60 * 60 // 1 hour
+
+function generateCsrfToken(): string {
+  const timestamp = Math.floor(Date.now() / 1000).toString(16)
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  const random = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+  return `${timestamp}.${random}`
+}
+
+function isCsrfTokenExpired(token: string): boolean {
+  const dotIndex = token.indexOf('.')
+  if (dotIndex === -1) return true // legacy format, treat as expired
+  const timestampHex = token.substring(0, dotIndex)
+  const issuedAt = parseInt(timestampHex, 16)
+  if (isNaN(issuedAt)) return true
+  const age = Math.floor(Date.now() / 1000) - issuedAt
+  return age > CSRF_MAX_AGE_SECONDS || age < 0
+}
+
+async function computeAdminCookieHash(adminSecretKey: string): Promise<string> {
+  const data = new TextEncoder().encode(`keyhub_admin_session:${adminSecretKey}`)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Allow public routes through
+  // Allow public routes through (only NextAuth's own routes, not custom /api/auth/* endpoints)
+  const nextAuthRoutes = ['/api/auth/callback', '/api/auth/signin', '/api/auth/signout', '/api/auth/session', '/api/auth/csrf', '/api/auth/providers', '/api/auth/error']
+  const publicAuthRoutes = ['/api/auth/register', '/api/auth/verify-email', '/api/auth/resend-verification', '/api/auth/admin-unlock']
   if (
-    pathname.startsWith('/api/auth') ||
+    nextAuthRoutes.some((r) => pathname.startsWith(r)) ||
+    publicAuthRoutes.some((r) => pathname === r) ||
     pathname.startsWith('/api/v1') ||
     pathname.startsWith('/api/health') ||
     pathname.startsWith('/api/cron') ||
@@ -54,21 +83,22 @@ export async function middleware(req: NextRequest) {
 
   // CSRF protection for ALL mutation API routes (POST, PATCH, DELETE)
   // Exempt: /api/auth (NextAuth), /api/v1 (already exempted above), admin routes (handled separately below)
-  if (pathname.startsWith('/api/') && !isAdminRoute) {
+  // Also exempt pre-authentication endpoints that have their own rate limiting
+  const csrfExemptAuthRoutes = ['/api/auth/register', '/api/auth/verify-email', '/api/auth/resend-verification', '/api/auth/admin-unlock']
+  const isCsrfExempt = csrfExemptAuthRoutes.some((r) => pathname === r)
+  if (pathname.startsWith('/api/') && !isAdminRoute && !isCsrfExempt) {
     const method = req.method.toUpperCase()
-    if (method === 'POST' || method === 'PATCH' || method === 'DELETE') {
+    if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
       const csrfHeader = req.headers.get('x-csrf-token')
       const csrfCookie = req.cookies.get('__keyhub_csrf')?.value
-      if (csrfHeader && csrfCookie && csrfHeader === csrfCookie) {
-        // CSRF token is valid — proceed
+      if (csrfHeader && csrfCookie && csrfHeader === csrfCookie && !isCsrfTokenExpired(csrfCookie)) {
+        // CSRF token is valid and not expired — proceed
       } else {
-        // If no cookie set yet, generate one but still block the mutation
-        if (!csrfCookie) {
-          const bytes = new Uint8Array(32)
-          crypto.getRandomValues(bytes)
-          const csrfToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+        // If no cookie set yet or token expired, generate a new one but still block the mutation
+        if (!csrfCookie || isCsrfTokenExpired(csrfCookie)) {
+          const csrfToken = generateCsrfToken()
           const response = NextResponse.json(
-            { error: 'CSRF token missing. Reload the page and try again.' },
+            { error: 'CSRF token missing or expired. Reload the page and try again.' },
             { status: 403 }
           )
           response.cookies.set('__keyhub_csrf', csrfToken, {
@@ -76,7 +106,7 @@ export async function middleware(req: NextRequest) {
             sameSite: 'lax',
             secure: process.env.NODE_ENV === 'production',
             path: '/',
-            maxAge: 60 * 60,
+            maxAge: CSRF_MAX_AGE_SECONDS,
           })
           return response
         }
@@ -90,8 +120,29 @@ export async function middleware(req: NextRequest) {
 
   // Admin routes: return 404 for non-admins to hide the panel's existence
   if (isAdminRoute) {
-    if (!isLoggedIn || token?.role !== 'SUPER_ADMIN') {
+    // Allow impersonation exit even when impersonating a non-admin user
+    const isImpersonationExit = pathname === '/api/admin/impersonate/exit' && token?.impersonatedBy
+    if (!isLoggedIn || (token?.role !== 'SUPER_ADMIN' && !isImpersonationExit)) {
       return new NextResponse('Not Found', { status: 404 })
+    }
+
+    // ADMIN_SECRET_KEY enforcement: when set, require matching cookie on all admin routes
+    // Skip for impersonation exit (already handled above)
+    const adminSecretKey = process.env.ADMIN_SECRET_KEY
+    if (adminSecretKey && !isImpersonationExit) {
+      const providedKey = req.cookies.get('__keyhub_admin_key')?.value
+      // Cookie stores a SHA-256 hash, not the raw key — compute expected hash
+      const expectedHash = await computeAdminCookieHash(adminSecretKey)
+      if (providedKey !== expectedHash) {
+        // Redirect to unlock page (not API routes — those get 404)
+        if (pathname.startsWith('/api/admin')) {
+          return new NextResponse('Not Found', { status: 404 })
+        }
+        if (pathname !== '/admin/unlock') {
+          return NextResponse.redirect(new URL('/admin/unlock', req.url))
+        }
+        return NextResponse.next()
+      }
     }
 
     // Admin IP allowlist check
@@ -101,8 +152,8 @@ export async function middleware(req: NextRequest) {
       return new NextResponse('Not Found', { status: 404 })
     }
 
-    // Admin session bound to IP: if IP changes mid-session, force re-auth
-    if (token?.adminIp && token.adminIp !== clientIp) {
+    // Admin session bound to IP: if IP changes mid-session or missing, force re-auth
+    if (!token?.adminIp || token.adminIp !== clientIp) {
       const loginUrl = new URL('/login', req.url)
       loginUrl.searchParams.set('reason', 'admin_ip_changed')
       return NextResponse.redirect(loginUrl)
@@ -113,14 +164,14 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL('/totp', req.url))
     }
 
-    // Admin inactivity auto-logout: check if JWT was issued too long ago
+    // Admin inactivity auto-logout: check last activity time
     const adminTimeoutMinutes = parseInt(
       process.env.ADMIN_SESSION_TIMEOUT_MINUTES || '30',
       10
     )
-    const issuedAt = token?.issuedAt as number | undefined
-    if (issuedAt) {
-      const elapsed = Date.now() - issuedAt
+    const lastActivity = (token?.lastActivity ?? token?.issuedAt) as number | undefined
+    if (lastActivity) {
+      const elapsed = Date.now() - lastActivity
       if (elapsed > adminTimeoutMinutes * 60 * 1000) {
         // Session expired — redirect to login for re-authentication
         const loginUrl = new URL('/login', req.url)
@@ -132,19 +183,16 @@ export async function middleware(req: NextRequest) {
     // CSRF protection for admin mutation endpoints (POST, PATCH, DELETE)
     if (pathname.startsWith('/api/admin')) {
       const method = req.method.toUpperCase()
-      if (method === 'POST' || method === 'PATCH' || method === 'DELETE') {
+      if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
         const csrfHeader = req.headers.get('x-csrf-token')
         const csrfCookie = req.cookies.get('__keyhub_csrf')?.value
-        if (csrfHeader && csrfCookie && csrfHeader === csrfCookie) {
-          // CSRF token is valid — proceed
+        if (csrfHeader && csrfCookie && csrfHeader === csrfCookie && !isCsrfTokenExpired(csrfCookie)) {
+          // CSRF token is valid and not expired — proceed
         } else {
-          // If no cookie set yet, generate one but still block the mutation
-          if (!csrfCookie) {
-            const bytes = new Uint8Array(32)
-            crypto.getRandomValues(bytes)
-            const csrfToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+          if (!csrfCookie || isCsrfTokenExpired(csrfCookie)) {
+            const csrfToken = generateCsrfToken()
             const response = NextResponse.json(
-              { error: 'CSRF token missing. Reload the page and try again.' },
+              { error: 'CSRF token missing or expired. Reload the page and try again.' },
               { status: 403 }
             )
             response.cookies.set('__keyhub_csrf', csrfToken, {
@@ -152,7 +200,7 @@ export async function middleware(req: NextRequest) {
               sameSite: 'lax',
               secure: process.env.NODE_ENV === 'production',
               path: '/',
-              maxAge: 60 * 60,
+              maxAge: CSRF_MAX_AGE_SECONDS,
             })
             return response
           }
@@ -164,18 +212,17 @@ export async function middleware(req: NextRequest) {
       }
     }
 
-    // For admin page requests (not API), ensure CSRF cookie exists
-    if (!pathname.startsWith('/api/') && !req.cookies.get('__keyhub_csrf')?.value) {
-      const bytes = new Uint8Array(32)
-      crypto.getRandomValues(bytes)
-      const csrfToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+    // For admin page requests (not API), ensure CSRF cookie exists and is fresh
+    const adminCsrf = req.cookies.get('__keyhub_csrf')?.value
+    if (!pathname.startsWith('/api/') && (!adminCsrf || isCsrfTokenExpired(adminCsrf))) {
+      const csrfToken = generateCsrfToken()
       const response = NextResponse.next()
       response.cookies.set('__keyhub_csrf', csrfToken, {
         httpOnly: false,
         sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
         path: '/',
-        maxAge: 60 * 60,
+        maxAge: CSRF_MAX_AGE_SECONDS,
       })
       return response
     }
@@ -187,6 +234,20 @@ export async function middleware(req: NextRequest) {
   if (isLoggedIn && token?.requiresTotp) {
     // User is logged in but needs TOTP verification
     if (isTotpPage) {
+      // Ensure CSRF cookie is set for the TOTP page so the challenge POST works
+      const totpCsrf = req.cookies.get('__keyhub_csrf')?.value
+      if (!totpCsrf || isCsrfTokenExpired(totpCsrf)) {
+        const csrfToken = generateCsrfToken()
+        const response = NextResponse.next()
+        response.cookies.set('__keyhub_csrf', csrfToken, {
+          httpOnly: false,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          path: '/',
+          maxAge: CSRF_MAX_AGE_SECONDS,
+        })
+        return response
+      }
       return NextResponse.next()
     }
     // Redirect to TOTP challenge for all non-TOTP pages
@@ -227,18 +288,17 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // For page requests (not API), ensure CSRF cookie exists for the double-submit pattern
-  if (!pathname.startsWith('/api/') && !req.cookies.get('__keyhub_csrf')?.value) {
-    const bytes = new Uint8Array(32)
-    crypto.getRandomValues(bytes)
-    const csrfToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+  // For page requests (not API), ensure CSRF cookie exists and is fresh
+  const pageCsrf = req.cookies.get('__keyhub_csrf')?.value
+  if (!pathname.startsWith('/api/') && (!pageCsrf || isCsrfTokenExpired(pageCsrf))) {
+    const csrfToken = generateCsrfToken()
     const response = NextResponse.next()
     response.cookies.set('__keyhub_csrf', csrfToken, {
       httpOnly: false,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
-      maxAge: 60 * 60,
+      maxAge: CSRF_MAX_AGE_SECONDS,
     })
     return response
   }

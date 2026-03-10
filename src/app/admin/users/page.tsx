@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -96,7 +97,7 @@ export default function AdminUsersPage() {
     setToggling(userId)
     try {
       const newRole = currentRole === 'SUPER_ADMIN' ? 'USER' : 'SUPER_ADMIN'
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: userId, role: newRole }),
@@ -114,7 +115,7 @@ export default function AdminUsersPage() {
   async function handleDelete(userId: string) {
     setDeleting(userId)
     try {
-      const res = await fetch(`/api/admin/users?id=${userId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/admin/users?id=${userId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete user')
       fetchUsers()
       addToast({ title: 'User deleted', variant: 'success' })
@@ -129,7 +130,7 @@ export default function AdminUsersPage() {
     if (!suspendDialogUser || !suspendReason.trim()) return
     setSuspending(true)
     try {
-      const res = await fetch(`/api/admin/users/${suspendDialogUser.id}/suspend`, {
+      const res = await apiFetch(`/api/admin/users/${suspendDialogUser.id}/suspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: suspendReason.trim() }),
@@ -142,8 +143,8 @@ export default function AdminUsersPage() {
       setSuspendDialogUser(null)
       setSuspendReason('')
       fetchUsers()
-    } catch (err: any) {
-      addToast({ title: err.message, variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: err instanceof Error ? err.message : 'Operation failed', variant: 'destructive' })
     } finally {
       setSuspending(false)
     }
@@ -152,7 +153,7 @@ export default function AdminUsersPage() {
   async function handleUnsuspend(userId: string) {
     setUnsuspending(userId)
     try {
-      const res = await fetch(`/api/admin/users/${userId}/unsuspend`, {
+      const res = await apiFetch(`/api/admin/users/${userId}/unsuspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),

@@ -74,9 +74,9 @@ export async function POST(req: Request) {
     } catch {}
 
     return NextResponse.json({ success: false, error: message, latencyMs })
-  } catch (err: any) {
+  } catch (err: unknown) {
     const latencyMs = Date.now() - start
-    const message = err.name === 'TimeoutError' ? 'Connection timed out (15s)' : err.message
+    const message = err instanceof Error ? (err.name === 'TimeoutError' ? 'Connection timed out (15s)' : err.message) : 'Unknown error'
     return NextResponse.json({ success: false, error: message, latencyMs })
   }
 }

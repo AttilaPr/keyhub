@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -89,7 +90,7 @@ export default function AdminKeysPage() {
   async function handleToggle(id: string, isActive: boolean) {
     setToggling(id)
     try {
-      const res = await fetch('/api/admin/keys', {
+      const res = await apiFetch('/api/admin/keys', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, type: tab, isActive: !isActive }),
@@ -107,7 +108,7 @@ export default function AdminKeysPage() {
     if (!deleteTarget || !deleteReason.trim()) return
     setDeleting(true)
     try {
-      const res = await fetch('/api/admin/keys', {
+      const res = await apiFetch('/api/admin/keys', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: deleteTarget.id, type: deleteTarget.type, reason: deleteReason.trim() }),
@@ -120,8 +121,8 @@ export default function AdminKeysPage() {
       setDeleteTarget(null)
       setDeleteReason('')
       fetchKeys()
-    } catch (err: any) {
-      addToast({ title: err.message || 'Failed to delete key', variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: err instanceof Error ? err.message : 'Failed to delete key', variant: 'destructive' })
     } finally {
       setDeleting(false)
     }
@@ -131,7 +132,7 @@ export default function AdminKeysPage() {
     if (!revokeTarget) return
     setRevoking(true)
     try {
-      const res = await fetch('/api/admin/keys/revoke', {
+      const res = await apiFetch('/api/admin/keys/revoke', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: revokeTarget.id }),
@@ -143,8 +144,8 @@ export default function AdminKeysPage() {
       addToast({ title: 'Key revoked', description: 'Key will return 401 on all future requests', variant: 'success' })
       setRevokeTarget(null)
       fetchKeys()
-    } catch (err: any) {
-      addToast({ title: err.message || 'Failed to revoke key', variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: err instanceof Error ? err.message : 'Failed to revoke key', variant: 'destructive' })
     } finally {
       setRevoking(false)
     }
@@ -157,7 +158,7 @@ export default function AdminKeysPage() {
     }
     setLeakedSearching(true)
     try {
-      const res = await fetch('/api/admin/incident/leaked-key', {
+      const res = await apiFetch('/api/admin/incident/leaked-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keyPrefix: leakedPrefix.trim() }),
@@ -173,8 +174,8 @@ export default function AdminKeysPage() {
         variant: 'success',
       })
       fetchKeys()
-    } catch (err: any) {
-      addToast({ title: err.message || 'Failed to process leaked key', variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: err instanceof Error ? err.message : 'Failed to process leaked key', variant: 'destructive' })
     } finally {
       setLeakedSearching(false)
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +19,7 @@ import { ChevronUpIcon } from '@/components/ui/chevron-up'
 
 interface AuditEvent {
   id: string
-  actorId: string
+  actorId: string | null
   userId: string | null
   action: string
   targetType: string | null
@@ -89,7 +89,7 @@ export default function AdminAuditPage() {
         addToast({ title: 'Failed to load audit events', variant: 'destructive' })
       })
       .finally(() => setLoading(false))
-  }, [page, actorFilter, userFilter, actionFilter, fromDate, toDate])
+  }, [page, actorFilter, userFilter, actionFilter, fromDate, toDate, addToast])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
@@ -225,9 +225,8 @@ export default function AdminAuditPage() {
                   const meta = parseMetadata(event.metadata)
                   const isExpanded = expandedId === event.id
                   return (
-                    <>
+                    <React.Fragment key={event.id}>
                       <TableRow
-                        key={event.id}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => setExpandedId(isExpanded ? null : event.id)}
                       >
@@ -244,7 +243,7 @@ export default function AdminAuditPage() {
                               {event.actor?.role === 'SUPER_ADMIN' ? 'ADMIN' : 'USER'}
                             </Badge>
                             <div>
-                              <p className="text-xs text-muted-foreground">{event.actor?.name || event.actor?.email || event.actorId}</p>
+                              <p className="text-xs text-muted-foreground">{event.actor?.name || event.actor?.email || event.actorId || 'Deleted User'}</p>
                               {event.actor?.email && (
                                 <p className="text-[10px] text-muted-foreground">{event.actor.email}</p>
                               )}
@@ -311,7 +310,7 @@ export default function AdminAuditPage() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </React.Fragment>
                   )
                 })
               )}

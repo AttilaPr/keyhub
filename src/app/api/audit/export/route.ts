@@ -45,12 +45,12 @@ export async function GET(req: Request) {
   }
 
   const rows = events.map((e) => [
-    e.createdAt.toISOString(),
-    e.actorId,
-    e.action,
-    e.targetType || '',
-    e.targetId || '',
-    e.ip || '',
+    escapeCsv(e.createdAt.toISOString()),
+    escapeCsv(e.actorId ?? ''),
+    escapeCsv(e.action),
+    escapeCsv(e.targetType || ''),
+    escapeCsv(e.targetId || ''),
+    escapeCsv(e.ip || ''),
     escapeCsv(e.userAgent || ''),
   ])
 

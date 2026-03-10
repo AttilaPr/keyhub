@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -87,7 +88,7 @@ export default function TemplatesPage() {
 
     try {
       if (editingTemplate) {
-        const res = await fetch('/api/templates', {
+        const res = await apiFetch('/api/templates', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -104,7 +105,7 @@ export default function TemplatesPage() {
         }
         addToast({ title: 'Template updated', variant: 'success' })
       } else {
-        const res = await fetch('/api/templates', {
+        const res = await apiFetch('/api/templates', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, description: description || null, systemPrompt }),
@@ -131,7 +132,7 @@ export default function TemplatesPage() {
     if (!deleteId) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/templates?id=${deleteId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/templates?id=${deleteId}`, { method: 'DELETE' })
       if (res.ok) {
         addToast({ title: 'Template deleted', variant: 'default' })
         setDeleteId(null)

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { parseModel } from '@/lib/model-routing'
 import { decryptKey } from '@/lib/encryption'
 import { PROVIDERS, type ProviderName } from '@/lib/providers'
-import { calculateCost, MODEL_PRICING } from '@/lib/cost-calculator'
+import { calculateCost, getModelPricing } from '@/lib/cost-calculator'
 import { verifyPlatformKey } from '@/lib/platform-key'
 import { checkUserBudget, checkKeyBudget, getPeriodEnd } from '@/lib/budget'
 import { withRetry } from '@/lib/retry'
@@ -284,8 +284,8 @@ export async function POST(req: Request) {
   let provider: string, modelId: string
   try {
     ({ provider, modelId } = parseModel(model))
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 })
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Invalid model format' }, { status: 400 })
   }
 
   if (!(provider in PROVIDERS)) {
@@ -311,7 +311,7 @@ export async function POST(req: Request) {
   // Pre-flight cost estimation
   if (platformKey.maxCostPerRequest) {
     const estimatedTokens = estimateInputTokens(messages)
-    const pricing = MODEL_PRICING[modelId]
+    const pricing = getModelPricing()[modelId]
     if (pricing) {
       const estimatedInputCost = (estimatedTokens / 1_000_000) * pricing.input
       if (estimatedInputCost > platformKey.maxCostPerRequest) {
@@ -418,9 +418,12 @@ export async function POST(req: Request) {
       status: streamResponse.status,
       headers: responseHeaders,
     })
-  } catch (err: any) {
-    // Extract error status code from the provider error
-    const errorStatus = err?.status ?? err?.statusCode ?? 500
+  } catch (err: unknown) {
+    // Extract error status code from the provider error (SDK-specific properties)
+    const errorObj = err as Record<string, unknown>
+    const errorStatus = (typeof errorObj?.status === 'number' ? errorObj.status : null)
+      ?? (typeof errorObj?.statusCode === 'number' ? errorObj.statusCode : null)
+      ?? 500
 
     // --- Fallback Routing ---
     // Check if there are fallback rules for this platform key and provider
@@ -527,12 +530,12 @@ export async function POST(req: Request) {
         costUsd: 0,
         retryCount,
         status: 'failed',
-        errorMessage: err.message,
+        errorMessage: err instanceof Error ? err.message : 'Unknown error',
         latencyMs: Date.now() - start,
         tag,
         prompt: JSON.stringify(messages),
       },
     })
-    return NextResponse.json({ error: err.message }, { status: 500, headers: rateLimitHeaders })
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500, headers: rateLimitHeaders })
   }
 }

@@ -38,6 +38,7 @@ import { KeyIcon } from '@/components/ui/key'
 import { BellIcon } from '@/components/ui/bell'
 import { ActivityIcon } from '@/components/ui/activity'
 import { useAnimatedIcon } from '@/hooks/use-animated-icon'
+import { apiFetch } from '@/lib/fetch'
 
 type MfaSetupStep = 'idle' | 'qr' | 'verify' | 'backup'
 
@@ -68,6 +69,7 @@ export default function SettingsPage() {
   const [qrCode, setQrCode] = useState('')
   const [manualEntryKey, setManualEntryKey] = useState('')
   const [totpCode, setTotpCode] = useState('')
+  const [setupPassword, setSetupPassword] = useState('')
   const [setupError, setSetupError] = useState('')
   const [setupLoading, setSetupLoading] = useState(false)
   const [backupCodes, setBackupCodes] = useState<string[]>([])
@@ -154,7 +156,7 @@ export default function SettingsPage() {
   async function handleBudgetSave() {
     setSavingBudget(true)
     try {
-      const res = await fetch('/api/budget', {
+      const res = await apiFetch('/api/budget', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,10 +177,12 @@ export default function SettingsPage() {
     }
   }
 
-  if (session?.user?.name && !nameInitialized) {
-    setName(session.user.name)
-    setNameInitialized(true)
-  }
+  useEffect(() => {
+    if (session?.user?.name && !nameInitialized) {
+      setName(session.user.name)
+      setNameInitialized(true)
+    }
+  }, [session?.user?.name, nameInitialized])
 
   async function handleProfileUpdate(e: React.FormEvent) {
     e.preventDefault()
@@ -188,7 +192,7 @@ export default function SettingsPage() {
     }
     setSavingProfile(true)
     try {
-      const res = await fetch('/api/settings/profile', {
+      const res = await apiFetch('/api/settings/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim() }),
@@ -214,7 +218,7 @@ export default function SettingsPage() {
     }
     setDeleting(true)
     try {
-      const res = await fetch('/api/settings/account', {
+      const res = await apiFetch('/api/settings/account', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: deletePassword }),
@@ -247,7 +251,7 @@ export default function SettingsPage() {
 
     setSaving(true)
     try {
-      const res = await fetch('/api/settings/password', {
+      const res = await apiFetch('/api/settings/password', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentPassword, newPassword }),
@@ -274,7 +278,7 @@ export default function SettingsPage() {
     setSetupLoading(true)
     setSetupError('')
     try {
-      const res = await fetch('/api/auth/totp/setup', { method: 'POST' })
+      const res = await apiFetch('/api/auth/totp/setup', { method: 'POST' })
       const data = await res.json()
       if (res.ok) {
         setQrCode(data.qrCode)
@@ -296,10 +300,10 @@ export default function SettingsPage() {
     setSetupLoading(true)
     setSetupError('')
     try {
-      const res = await fetch('/api/auth/totp/verify-setup', {
+      const res = await apiFetch('/api/auth/totp/verify-setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: totpCode }),
+        body: JSON.stringify({ code: totpCode, password: setupPassword }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -323,7 +327,7 @@ export default function SettingsPage() {
     setDisableLoading(true)
     setDisableError('')
     try {
-      const res = await fetch('/api/auth/totp/disable', {
+      const res = await apiFetch('/api/auth/totp/disable', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: disablePassword, code: disableCode }),
@@ -370,7 +374,7 @@ export default function SettingsPage() {
   async function handleExportData() {
     setExporting(true)
     try {
-      const res = await fetch('/api/settings/export', { method: 'POST' })
+      const res = await apiFetch('/api/settings/export', { method: 'POST' })
       if (res.ok) {
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
@@ -397,6 +401,7 @@ export default function SettingsPage() {
     setQrCode('')
     setManualEntryKey('')
     setTotpCode('')
+    setSetupPassword('')
     setSetupError('')
     setBackupCodes([])
   }
@@ -404,7 +409,7 @@ export default function SettingsPage() {
   async function handleNotifPrefsSave() {
     setSavingNotifPrefs(true)
     try {
-      const res = await fetch('/api/settings/notifications', {
+      const res = await apiFetch('/api/settings/notifications', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -435,7 +440,7 @@ export default function SettingsPage() {
     }
     setSavingAnomalySettings(true)
     try {
-      const res = await fetch('/api/settings/notifications', {
+      const res = await apiFetch('/api/settings/notifications', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -687,7 +692,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button onClick={() => { setSetupStep('verify'); setTotpCode(''); setSetupError('') }}>
+                <Button onClick={() => { setSetupStep('verify'); setTotpCode(''); setSetupPassword(''); setSetupError('') }}>
                   Continue
                 </Button>
               </div>
@@ -704,6 +709,17 @@ export default function SettingsPage() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
+                  <Label htmlFor="setup-password">Password</Label>
+                  <Input
+                    id="setup-password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={setupPassword}
+                    onChange={(e) => setSetupPassword(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="setup-totp-code">Authentication Code</Label>
                   <Input
                     id="setup-totp-code"
@@ -717,9 +733,8 @@ export default function SettingsPage() {
                       const val = e.target.value.replace(/\D/g, '')
                       if (val.length <= 6) setTotpCode(val)
                     }}
-                    autoFocus
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && totpCode.length === 6) handleVerifySetup()
+                      if (e.key === 'Enter' && totpCode.length === 6 && setupPassword) handleVerifySetup()
                     }}
                   />
                 </div>
@@ -731,7 +746,7 @@ export default function SettingsPage() {
                 </Button>
                 <Button
                   onClick={handleVerifySetup}
-                  disabled={setupLoading || totpCode.length !== 6}
+                  disabled={setupLoading || totpCode.length !== 6 || !setupPassword}
                 >
                   {setupLoading && <LoaderPinwheelIcon size={16} className="mr-2 animate-spin" />}
                   Verify & Enable

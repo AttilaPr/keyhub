@@ -56,13 +56,16 @@ export function generateBackupCodes(count: number = 10): string[] {
   const codes: string[] = []
   for (let i = 0; i < count; i++) {
     // Generate 8-char alphanumeric codes (lowercase + digits)
-    const bytes = randomBytes(6)
-    const code = bytes
-      .toString('base64url')
-      .replace(/[^a-z0-9]/gi, '')
-      .slice(0, 8)
-      .toLowerCase()
-    codes.push(code)
+    // Use extra bytes to guarantee at least 8 chars after filtering
+    let code = ''
+    while (code.length < 8) {
+      const bytes = randomBytes(8)
+      code += bytes
+        .toString('base64url')
+        .replace(/[^a-z0-9]/gi, '')
+        .toLowerCase()
+    }
+    codes.push(code.slice(0, 8))
   }
   return codes
 }

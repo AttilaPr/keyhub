@@ -30,6 +30,7 @@ import { LoaderPinwheelIcon } from '@/components/ui/loader-pinwheel'
 import { useAnimatedIcon } from '@/hooks/use-animated-icon'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import { apiFetch } from '@/lib/fetch'
 
 function highlightText(text: string, search: string): React.ReactNode {
   if (!search || !search.trim()) return text
@@ -123,7 +124,7 @@ export default function LogsPage() {
         if (!res.ok) throw new Error('Failed to load keys')
         return res.json()
       })
-      .then((data) => setPlatformKeys(data.map((k: any) => ({ id: k.id, label: k.label, keyPrefix: k.keyPrefix }))))
+      .then((data) => setPlatformKeys(data.map((k: { id: string; label: string; keyPrefix: string }) => ({ id: k.id, label: k.label, keyPrefix: k.keyPrefix }))))
       .catch(() => {
         addToast({ title: 'Could not load API keys for filter', variant: 'destructive' })
       })
@@ -131,6 +132,7 @@ export default function LogsPage() {
       .then((res) => res.ok ? res.json() : null)
       .then((data) => { if (data?.tags) setAvailableTags(data.tags) })
       .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Debounce search input
@@ -142,6 +144,13 @@ export default function LogsPage() {
       setSearchQuery(value)
       setPage(1)
     }, 400)
+  }, [])
+
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    }
   }, [])
 
   function toggleSort(field: string) {
@@ -186,7 +195,7 @@ export default function LogsPage() {
 
     try {
       // Get original request data
-      const replayRes = await fetch(`/api/logs/${log.id}/replay`, { method: 'POST' })
+      const replayRes = await apiFetch(`/api/logs/${log.id}/replay`, { method: 'POST' })
       if (!replayRes.ok) {
         const data = await replayRes.json()
         addToast({ title: 'Replay failed', description: data.error || 'Could not fetch original request', variant: 'destructive' })
@@ -198,7 +207,7 @@ export default function LogsPage() {
 
       // Make the actual replay request
       const replayStart = Date.now()
-      const completionRes = await fetch('/api/v1/chat/completions', {
+      const completionRes = await apiFetch('/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -234,8 +243,8 @@ export default function LogsPage() {
           latencyMs: replayLatency,
         })
       }
-    } catch (err: any) {
-      addToast({ title: 'Replay error', description: err.message, variant: 'destructive' })
+    } catch (err: unknown) {
+      addToast({ title: 'Replay error', description: err instanceof Error ? err.message : 'Replay failed', variant: 'destructive' })
     } finally {
       setReplaying(false)
     }
@@ -275,9 +284,9 @@ export default function LogsPage() {
       const data = await res.json()
       setLogs(data.logs)
       setTotal(data.total)
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return
-      setError(err.message || 'Failed to load logs')
+      setError(err instanceof Error ? err.message : 'Failed to load logs')
       setLogs([])
       setTotal(0)
     } finally {

@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { apiFetch } from '@/lib/fetch'
 import { Crosshair } from 'lucide-react'
 import { PlusIcon } from '@/components/ui/plus'
 import { CopyIcon } from '@/components/ui/copy'
@@ -154,7 +155,7 @@ export default function PlatformKeysPage() {
     e.preventDefault()
     setSaving(true)
 
-    const res = await fetch('/api/keys/platform', {
+    const res = await apiFetch('/api/keys/platform', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -183,7 +184,7 @@ export default function PlatformKeysPage() {
   async function handleToggle(id: string, isActive: boolean) {
     setTogglingId(id)
     try {
-      const res = await fetch('/api/keys/platform', {
+      const res = await apiFetch('/api/keys/platform', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, isActive }),
@@ -226,7 +227,7 @@ export default function PlatformKeysPage() {
       ? editAllowedModels.filter((m) => editAllowedProviders.some((p) => m.startsWith(`${p}/`)))
       : editAllowedModels
 
-    const res = await fetch('/api/keys/platform', {
+    const res = await apiFetch('/api/keys/platform', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -261,7 +262,7 @@ export default function PlatformKeysPage() {
     if (!deleteId) return
     setDeleting(true)
     try {
-      const res = await fetch(`/api/keys/platform?id=${deleteId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/keys/platform?id=${deleteId}`, { method: 'DELETE' })
       if (res.ok) {
         addToast({ title: 'Key deleted', variant: 'default' })
         setDeleteId(null)

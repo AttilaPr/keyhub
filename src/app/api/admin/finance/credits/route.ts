@@ -3,12 +3,12 @@ import { requireSuperAdmin } from '@/lib/admin'
 import prisma from '@/lib/prisma'
 
 export async function GET(req: Request) {
-  const session = await requireSuperAdmin()
+  const session = await requireSuperAdmin(req)
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const url = new URL(req.url)
-  const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10))
-  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') ?? '20', 10)))
+  const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') ?? '20', 10) || 20))
   const search = url.searchParams.get('search') ?? ''
 
   const where = search
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
   ])
 
   // Enrich with admin email
-  const adminIds = [...new Set(transactions.map((t) => t.adminId))]
+  const adminIds = [...new Set(transactions.map((t) => t.adminId).filter((id): id is string => id !== null))]
   const admins = adminIds.length > 0
     ? await prisma.user.findMany({
         where: { id: { in: adminIds } },
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
 
   const enrichedTransactions = transactions.map((t) => ({
     ...t,
-    adminEmail: adminMap.get(t.adminId) ?? 'Unknown',
+    adminEmail: t.adminId ? adminMap.get(t.adminId) ?? 'Unknown' : 'Deleted',
   }))
 
   return NextResponse.json({

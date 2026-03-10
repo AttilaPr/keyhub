@@ -3,32 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcrypt'
 import prisma from '@/lib/prisma'
 import { headers } from 'next/headers'
-
-// TODO: Replace with Redis/Upstash rate limiting for production use.
-// In-memory rate limiting does not work across multiple Vercel instances,
-// but provides baseline protection for single-instance deployments.
-const LOGIN_MAX_ATTEMPTS = 5
-const LOGIN_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
-const loginAttempts = new Map<string, number[]>()
-
-function isLoginRateLimited(email: string): boolean {
-  const now = Date.now()
-  const key = email.toLowerCase()
-  const attempts = loginAttempts.get(key) || []
-
-  // Remove attempts outside the window
-  const recent = attempts.filter((t) => now - t < LOGIN_WINDOW_MS)
-  loginAttempts.set(key, recent)
-
-  return recent.length >= LOGIN_MAX_ATTEMPTS
-}
-
-function recordFailedLogin(email: string): void {
-  const key = email.toLowerCase()
-  const attempts = loginAttempts.get(key) || []
-  attempts.push(Date.now())
-  loginAttempts.set(key, attempts)
-}
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -42,19 +17,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const email = credentials.email as string
+        const email = (credentials.email as string).toLowerCase()
 
-        // Rate limit check
-        if (isLoginRateLimited(email)) {
+        // Database-backed rate limit check (works across Vercel instances)
+        // Only checks if blocked — does NOT increment on every attempt
+        const rlKey = `login:${email}`
+        const rl = await checkRateLimit(rlKey, {
+          maxAttempts: 5,
+          windowMs: 15 * 60 * 1000, // 15 minutes
+          checkOnly: true,
+        })
+        if (!rl.allowed) {
           return null
         }
 
         const user = await prisma.user.findUnique({
           where: { email },
+          select: {
+            id: true, email: true, name: true, role: true,
+            passwordHash: true, suspended: true, emailVerified: true,
+            totpEnabled: true,
+          },
         })
 
         if (!user) {
-          recordFailedLogin(email)
+          // Count as failed attempt
+          await checkRateLimit(rlKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000 }).catch(() => {})
           return null
         }
 
@@ -64,12 +52,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         )
 
         if (!passwordMatch) {
-          recordFailedLogin(email)
+          // Count as failed attempt
+          await checkRateLimit(rlKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000 }).catch(() => {})
           return null
         }
 
         // Block suspended users from logging in
         if (user.suspended) return null
+
+        // Block unverified email
+        if (!user.emailVerified) return null
 
         return {
           id: user.id,
@@ -110,8 +102,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (trigger === 'update' && session?.activeOrgId !== undefined) {
         token.activeOrgId = session.activeOrgId || undefined
       }
-      // Check for session invalidation and suspension on every token use
-      if (token.id) {
+      // Check for session invalidation and suspension periodically (every 60s)
+      // to avoid a DB query on every single request
+      const DB_CHECK_INTERVAL_MS = 60 * 1000 // 60 seconds
+      const lastDbCheck = (token.lastDbCheck as number) || 0
+      if (token.id && (Date.now() - lastDbCheck > DB_CHECK_INTERVAL_MS)) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
           select: { name: true, role: true, suspended: true, sessionInvalidatedAt: true },
@@ -131,6 +126,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.name = dbUser.name
           token.role = dbUser.role
         }
+        token.lastDbCheck = Date.now()
+      }
+      // Track last activity for admin session timeout
+      if (token.role === 'SUPER_ADMIN') {
+        token.lastActivity = Date.now()
       }
       return token
     },

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { apiFetch } from '@/lib/fetch'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -97,7 +98,7 @@ export default function AdminSettingsPage() {
   async function handleSave() {
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/system/config', {
+      const res = await apiFetch('/api/admin/system/config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(prefs),

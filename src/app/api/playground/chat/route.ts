@@ -32,8 +32,8 @@ export async function POST(req: Request) {
   let provider: string, modelId: string
   try {
     ({ provider, modelId } = parseModel(model))
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 })
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Invalid model format' }, { status: 400 })
   }
 
   if (!(provider in PROVIDERS)) {
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
     const result = streamText(streamOpts)
 
     return result.toTextStreamResponse()
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 })
   }
 }

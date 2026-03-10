@@ -70,10 +70,20 @@ export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { provider, label, apiKey, weight } = await req.json()
+  let body
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const { provider, label, apiKey, weight } = body
 
   if (!provider || !label || !apiKey) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  if (typeof label !== 'string' || label.length > 100) {
+    return NextResponse.json({ error: 'Label must be 100 characters or fewer' }, { status: 400 })
   }
 
   const VALID_PROVIDERS = ['openai', 'anthropic', 'google', 'mistral', 'groq']
@@ -130,7 +140,13 @@ export async function PATCH(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id, isActive, rotationReminderDays, weight } = await req.json()
+  let patchBody
+  try {
+    patchBody = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const { id, isActive, rotationReminderDays, weight } = patchBody
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
   const data: Record<string, unknown> = {}

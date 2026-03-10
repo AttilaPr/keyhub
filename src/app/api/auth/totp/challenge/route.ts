@@ -10,8 +10,11 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000 // 15 minutes
 const MAX_ATTEMPTS = 5
 
 export async function POST(req: Request) {
+  const proto = req.headers.get('x-forwarded-proto')
+  const isSecure = proto === 'https' || new URL(req.url).protocol === 'https:'
+
   // Get the token from the request (it should have requiresTotp: true)
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, secureCookie: isSecure })
 
   if (!token?.id || !token?.requiresTotp) {
     return NextResponse.json(
@@ -67,17 +70,21 @@ export async function POST(req: Request) {
       where: { userId, usedAt: null },
     })
 
+    // Compare against ALL codes to prevent timing attacks
+    let matchedId: string | null = null
     for (const bc of backupCodes) {
       const match = await bcrypt.compare(code.toLowerCase().trim(), bc.codeHash)
-      if (match) {
-        // Mark as used
-        await prisma.totpBackupCode.update({
-          where: { id: bc.id },
-          data: { usedAt: new Date() },
-        })
-        isValid = true
-        break
+      if (match && !matchedId) {
+        matchedId = bc.id
       }
+    }
+
+    if (matchedId) {
+      await prisma.totpBackupCode.update({
+        where: { id: matchedId },
+        data: { usedAt: new Date() },
+      })
+      isValid = true
     }
   } else {
     // Verify TOTP code
@@ -141,7 +148,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Server config error' }, { status: 500 })
   }
 
-  const isSecure = process.env.NODE_ENV === 'production'
   const cookieName = isSecure
     ? '__Secure-authjs.session-token'
     : 'authjs.session-token'
