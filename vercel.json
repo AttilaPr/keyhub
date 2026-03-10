@@ -17,7 +17,7 @@
     },
     {
       "path": "/api/cron/rate-limit-cleanup",
-      "schedule": "0 * * * *"
+            "schedule": "0 3 * * *"
     }
   ]
 }
