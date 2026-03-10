@@ -3,9 +3,17 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { Mail } from "lucide-react"
 import { LoaderPinwheelIcon } from "@/components/ui/loader-pinwheel"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Field,
   FieldDescription,
@@ -24,6 +32,7 @@ export function SignupForm({
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [showVerifyDialog, setShowVerifyDialog] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -43,7 +52,8 @@ export function SignupForm({
       return
     }
 
-    router.push("/login?registered=true")
+    setLoading(false)
+    setShowVerifyDialog(true)
   }
 
   return (
@@ -109,6 +119,27 @@ export function SignupForm({
           </FieldDescription>
         </Field>
       </FieldGroup>
+
+      <Dialog open={showVerifyDialog} onOpenChange={(open) => {
+        if (!open) router.push("/login")
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-lime-400/10">
+              <Mail className="size-6 text-lime-400" />
+            </div>
+            <DialogTitle className="text-center">Check your email</DialogTitle>
+            <DialogDescription className="text-center">
+              Please verify your email before signing in. Check your inbox for the verification link.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center">
+            <Button onClick={() => router.push("/login")}>
+              Go to Sign In
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </form>
   )
 }
