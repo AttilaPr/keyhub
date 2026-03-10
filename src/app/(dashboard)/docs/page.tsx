@@ -83,11 +83,12 @@ console.log(text)`,
   },
 ]
 
-const models = [
-  { provider: 'OpenAI', key: 'openai', models: ['openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/gpt-4-turbo', 'openai/o1', 'openai/o1-mini'] },
-  { provider: 'Anthropic', key: 'anthropic', models: ['anthropic/claude-3-5-sonnet-20241022', 'anthropic/claude-3-5-haiku-20241022', 'anthropic/claude-3-opus-20240229'] },
-  { provider: 'Google', key: 'google', models: ['google/gemini-1.5-pro', 'google/gemini-1.5-flash', 'google/gemini-2.0-flash'] },
-  { provider: 'Mistral', key: 'mistral', models: ['mistral/mistral-large-latest', 'mistral/mistral-small-latest', 'mistral/codestral-latest'] },
+// Fallback — replaced dynamically from /api/models on mount
+const FALLBACK_MODELS = [
+  { provider: 'OpenAI', key: 'openai', models: ['openai/gpt-4o', 'openai/gpt-4o-mini'] },
+  { provider: 'Anthropic', key: 'anthropic', models: ['anthropic/claude-3-5-sonnet-20241022'] },
+  { provider: 'Google', key: 'google', models: ['google/gemini-2.0-flash'] },
+  { provider: 'Mistral', key: 'mistral', models: ['mistral/mistral-large-latest'] },
 ]
 
 interface SetupStatus {
@@ -99,6 +100,7 @@ interface SetupStatus {
 export default function DocsPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [activeProviders, setActiveProviders] = useState<Set<string>>(new Set())
+  const [models, setModels] = useState(FALLBACK_MODELS)
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
   const [setupLoading, setSetupLoading] = useState(true)
   const { addToast } = useToast()
@@ -119,6 +121,13 @@ export default function DocsPage() {
           return res.json()
         })
         .then(setSetupStatus),
+      fetch('/api/models')
+        .then((res) => res.ok ? res.json() : null)
+        .then((data: { providers: { key: string; label: string; models: string[] }[] } | null) => {
+          if (data?.providers?.length) {
+            setModels(data.providers.map((p) => ({ provider: p.label, key: p.key, models: p.models })))
+          }
+        }),
     ])
       .catch(() => {
         addToast({ title: 'Could not load setup status', description: 'Some sections may be incomplete', variant: 'destructive' })

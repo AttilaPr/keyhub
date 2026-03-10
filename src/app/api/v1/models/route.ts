@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyPlatformKey } from '@/lib/platform-key'
-import { PROVIDER_MODELS } from '@/lib/providers'
+import { ensurePricingLoaded, getModelsByProvider } from '@/lib/cost-calculator'
 import prisma from '@/lib/prisma'
 
 export async function GET(req: Request) {
@@ -32,11 +32,14 @@ export async function GET(req: Request) {
     select: { provider: true },
   })
 
+  await ensurePricingLoaded()
+  const allModels = getModelsByProvider()
+
   const activeProviders = providerKeys.map((k) => k.provider)
   const models: { id: string; object: string; owned_by: string }[] = []
 
   for (const provider of activeProviders) {
-    const providerModels = PROVIDER_MODELS[provider] || []
+    const providerModels = allModels[provider] || []
     for (const modelId of providerModels) {
       models.push({
         id: `${provider}/${modelId}`,

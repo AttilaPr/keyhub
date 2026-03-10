@@ -118,6 +118,47 @@ export function getModelProvider(model: string): string | undefined {
   return providerMapCache?.[model]
 }
 
+// Providers we support (maps LiteLLM provider names to our provider keys)
+const SUPPORTED_PROVIDERS: Record<string, string> = {
+  openai: 'openai',
+  anthropic: 'anthropic',
+  vertex_ai: 'google',
+  'vertex_ai-language-models': 'google',
+  gemini: 'google',
+  mistral: 'mistral',
+}
+
+/**
+ * Returns all known models grouped by our provider keys.
+ * Only includes models from providers we actually support.
+ * Skips prefixed keys (e.g. "openai/gpt-4o") to avoid duplicates.
+ */
+export function getModelsByProvider(): Record<string, string[]> {
+  const pricing = getModelPricing()
+  const result: Record<string, string[]> = {}
+
+  for (const [model, _price] of Object.entries(pricing)) {
+    // Skip prefixed keys
+    if (model.includes('/')) continue
+
+    const litellmProvider = providerMapCache?.[model]
+    if (!litellmProvider) continue
+
+    const ourProvider = SUPPORTED_PROVIDERS[litellmProvider]
+    if (!ourProvider) continue
+
+    if (!result[ourProvider]) result[ourProvider] = []
+    result[ourProvider].push(model)
+  }
+
+  // Sort models within each provider alphabetically
+  for (const provider of Object.keys(result)) {
+    result[provider].sort()
+  }
+
+  return result
+}
+
 /** Sync cost calculation — uses cached pricing with fallback */
 export function calculateCost(model: string, promptTokens: number, completionTokens: number): number {
   const allPricing = getModelPricing()

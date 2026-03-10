@@ -45,11 +45,12 @@ function highlightText(text: string, search: string): React.ReactNode {
   )
 }
 
-const PROVIDER_MODELS: Record<string, string[]> = {
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini'],
-  anthropic: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229'],
-  google: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash'],
-  mistral: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'],
+// Populated from /api/models on mount
+const FALLBACK_PROVIDER_MODELS: Record<string, string[]> = {
+  openai: ['gpt-4o', 'gpt-4o-mini'],
+  anthropic: ['claude-3-5-sonnet-20241022'],
+  google: ['gemini-2.0-flash'],
+  mistral: ['mistral-large-latest'],
 }
 
 interface LogEntry {
@@ -99,6 +100,7 @@ export default function LogsPage() {
   const [keyFilter, setKeyFilter] = useState('all')
   const [tagFilter, setTagFilter] = useState('all')
   const [availableTags, setAvailableTags] = useState<string[]>([])
+  const [providerModels, setProviderModels] = useState<Record<string, string[]>>(FALLBACK_PROVIDER_MODELS)
   const [platformKeys, setPlatformKeys] = useState<PlatformKeyOption[]>([])
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -128,6 +130,18 @@ export default function LogsPage() {
       .catch(() => {
         addToast({ title: 'Could not load API keys for filter', variant: 'destructive' })
       })
+    fetch('/api/models')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { providers: { key: string; models: string[] }[] } | null) => {
+        if (data?.providers) {
+          const map: Record<string, string[]> = {}
+          for (const p of data.providers) {
+            map[p.key] = p.models.map((m) => m.replace(`${p.key}/`, ''))
+          }
+          setProviderModels(map)
+        }
+      })
+      .catch(() => {})
     fetch('/api/usage?days=365')
       .then((res) => res.ok ? res.json() : null)
       .then((data) => { if (data?.tags) setAvailableTags(data.tags) })
@@ -301,8 +315,8 @@ export default function LogsPage() {
   }, [page, providerFilter, statusFilter, modelFilter, keyFilter, tagFilter, fromDate, toDate, searchQuery, sortBy, sortOrder])
 
   const availableModels = providerFilter !== 'all'
-    ? PROVIDER_MODELS[providerFilter] || []
-    : Object.values(PROVIDER_MODELS).flat()
+    ? providerModels[providerFilter] || []
+    : Object.values(providerModels).flat()
 
   function clearFilters() {
     setProviderFilter('all')

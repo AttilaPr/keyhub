@@ -51,11 +51,12 @@ const PROVIDER_OPTIONS = [
   { value: 'mistral', label: 'Mistral' },
 ] as const
 
-const PROVIDER_MODELS: Record<string, string[]> = {
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini'],
-  anthropic: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229'],
-  google: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash'],
-  mistral: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'],
+// Populated from /api/models on mount
+const FALLBACK_PROVIDER_MODELS: Record<string, string[]> = {
+  openai: ['gpt-4o', 'gpt-4o-mini'],
+  anthropic: ['claude-3-5-sonnet-20241022'],
+  google: ['gemini-2.0-flash'],
+  mistral: ['mistral-large-latest'],
 }
 
 interface FallbackRule {
@@ -90,6 +91,7 @@ interface PlatformKey {
 
 export default function PlatformKeysPage() {
   const [keys, setKeys] = useState<PlatformKey[]>([])
+  const [providerModels, setProviderModels] = useState<Record<string, string[]>>(FALLBACK_PROVIDER_MODELS)
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [showKeyOpen, setShowKeyOpen] = useState(false)
@@ -129,9 +131,9 @@ export default function PlatformKeysPage() {
   const availableModels = useMemo(() => {
     const providers = editAllowedProviders.length > 0
       ? editAllowedProviders
-      : Object.keys(PROVIDER_MODELS)
-    return providers.flatMap((p) => (PROVIDER_MODELS[p] || []).map((m) => ({ provider: p, model: `${p}/${m}` })))
-  }, [editAllowedProviders])
+      : Object.keys(providerModels)
+    return providers.flatMap((p) => (providerModels[p] || []).map((m) => ({ provider: p, model: `${p}/${m}` })))
+  }, [editAllowedProviders, providerModels])
 
   async function fetchKeys(signal?: AbortSignal) {
     try {
@@ -148,6 +150,18 @@ export default function PlatformKeysPage() {
   useEffect(() => {
     const controller = new AbortController()
     fetchKeys(controller.signal)
+    fetch('/api/models')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { providers: { key: string; models: string[] }[] } | null) => {
+        if (data?.providers) {
+          const map: Record<string, string[]> = {}
+          for (const p of data.providers) {
+            map[p.key] = p.models.map((m) => m.replace(`${p.key}/`, ''))
+          }
+          setProviderModels(map)
+        }
+      })
+      .catch(() => {})
     return () => controller.abort()
   }, [])
 

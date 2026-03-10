@@ -50,11 +50,12 @@ interface ModelGroup {
   models: string[]
 }
 
-const ALL_MODELS: ModelGroup[] = [
-  { provider: 'OpenAI', key: 'openai', models: ['openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/gpt-4-turbo'] },
-  { provider: 'Anthropic', key: 'anthropic', models: ['anthropic/claude-3-5-sonnet-20241022', 'anthropic/claude-3-5-haiku-20241022', 'anthropic/claude-3-opus-20240229'] },
-  { provider: 'Google', key: 'google', models: ['google/gemini-1.5-pro', 'google/gemini-1.5-flash', 'google/gemini-2.0-flash'] },
-  { provider: 'Mistral', key: 'mistral', models: ['mistral/mistral-large-latest', 'mistral/mistral-small-latest', 'mistral/codestral-latest'] },
+// Models fetched dynamically from /api/models
+const FALLBACK_MODELS: ModelGroup[] = [
+  { provider: 'OpenAI', key: 'openai', models: ['openai/gpt-4o', 'openai/gpt-4o-mini'] },
+  { provider: 'Anthropic', key: 'anthropic', models: ['anthropic/claude-3-5-sonnet-20241022'] },
+  { provider: 'Google', key: 'google', models: ['google/gemini-2.0-flash'] },
+  { provider: 'Mistral', key: 'mistral', models: ['mistral/mistral-large-latest'] },
 ]
 
 interface PromptTemplate {
@@ -87,6 +88,7 @@ export default function PlaygroundPage() {
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [activeProviders, setActiveProviders] = useState<Set<string>>(new Set())
+  const [allModels, setAllModels] = useState<ModelGroup[]>(FALLBACK_MODELS)
   const [platformKeys, setPlatformKeys] = useState<{ id: string; label: string; keyPrefix: string }[]>([])
   const [selectedKeyId, setSelectedKeyId] = useState<string>('')
   const abortRef = useRef<AbortController | null>(null)
@@ -123,6 +125,13 @@ export default function PlaygroundPage() {
       .then((res) => res.ok ? res.json() : [])
       .then((keys: { provider: string; isActive: boolean }[]) => {
         setActiveProviders(new Set(keys.filter((k) => k.isActive).map((k) => k.provider)))
+      })
+      .catch(() => {})
+
+    fetch('/api/models')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: { providers: ModelGroup[] } | null) => {
+        if (data?.providers?.length) setAllModels(data.providers)
       })
       .catch(() => {})
 
@@ -360,7 +369,7 @@ export default function PlaygroundPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {ALL_MODELS.map((group) => {
+              {allModels.map((group) => {
                 const isActive = activeProviders.has(group.key)
                 return group.models.map((m) => (
                   <SelectItem key={m} value={m} disabled={!isActive}>
