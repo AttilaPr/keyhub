@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { SessionProvider } from "next-auth/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -35,6 +36,7 @@ export default async function RootLayout({
         <SessionProvider>
           <TooltipProvider>{children}</TooltipProvider>
         </SessionProvider>
+        <Analytics />
       </body>
     </html>
   );
