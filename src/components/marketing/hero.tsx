@@ -119,6 +119,13 @@ export function HeroSection() {
           single, unified endpoint. Track costs, manage keys, and monitor usage
           in real time.
         </p>
+        <div className="mx-auto mt-6 inline-flex items-center gap-2 rounded-full border border-lime-400/20 bg-lime-400/5 px-4 py-2 text-sm text-lime-400">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-lime-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-lime-400" />
+          </span>
+          Free AI models included — start building with zero cost
+        </div>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Button size="lg" render={<Link href="/register" />}>
             Get Started

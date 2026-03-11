@@ -9,8 +9,15 @@ import { ChartColumnIncreasingIcon } from "@/components/ui/chart-column-increasi
 import { LayersIcon } from "@/components/ui/layers"
 import { LockIcon } from "@/components/ui/lock"
 import { TerminalIcon } from "@/components/ui/terminal"
+import { SparklesIcon } from "@/components/ui/sparkles"
 
 const features = [
+  {
+    key: "free",
+    title: "Free AI Models",
+    description:
+      "Every account includes access to free AI models out of the box — no provider keys needed. Start building immediately at zero cost with 200K context, image understanding, and tool calling.",
+  },
   {
     key: "routing",
     title: "Multi-Provider Routing",
@@ -55,14 +62,31 @@ const features = [
   },
 ] as const
 
+const featureByKey = Object.fromEntries(features.map((f) => [f.key, f]))
+
+function FeatureFree() {
+  const { iconRef, handlers } = useAnimatedIcon()
+  const f = featureByKey.free
+  return (
+    <Card className="p-6 border-lime-400/20 bg-lime-400/5" {...handlers}>
+      <div className="px-4">
+        <SparklesIcon ref={iconRef} size={24} className="text-lime-400" />
+        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+      </div>
+    </Card>
+  )
+}
+
 function FeatureRouting() {
   const { iconRef, handlers } = useAnimatedIcon()
+  const f = featureByKey.routing
   return (
     <Card className="p-6" {...handlers}>
       <div className="px-4">
         <WorkflowIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{features[0].title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{features[0].description}</p>
+        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
       </div>
     </Card>
   )
@@ -70,12 +94,13 @@ function FeatureRouting() {
 
 function FeatureCost() {
   const { iconRef, handlers } = useAnimatedIcon()
+  const f = featureByKey.cost
   return (
     <Card className="p-6" {...handlers}>
       <div className="px-4">
         <DollarSignIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{features[1].title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{features[1].description}</p>
+        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
       </div>
     </Card>
   )
@@ -83,12 +108,13 @@ function FeatureCost() {
 
 function FeatureKeys() {
   const { iconRef, handlers } = useAnimatedIcon()
+  const f = featureByKey.keys
   return (
     <Card className="p-6" {...handlers}>
       <div className="px-4">
         <ShieldCheckIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{features[2].title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{features[2].description}</p>
+        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
       </div>
     </Card>
   )
@@ -96,12 +122,13 @@ function FeatureKeys() {
 
 function FeatureAnalytics() {
   const { iconRef, handlers } = useAnimatedIcon()
+  const f = featureByKey.analytics
   return (
     <Card className="p-6" {...handlers}>
       <div className="px-4">
         <ChartColumnIncreasingIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{features[3].title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{features[3].description}</p>
+        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
       </div>
     </Card>
   )
@@ -109,12 +136,13 @@ function FeatureAnalytics() {
 
 function FeatureLoadBalancing() {
   const { iconRef, handlers } = useAnimatedIcon()
+  const f = featureByKey.loadbalancing
   return (
     <Card className="p-6" {...handlers}>
       <div className="px-4">
         <LayersIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{features[4].title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{features[4].description}</p>
+        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
       </div>
     </Card>
   )
@@ -122,12 +150,13 @@ function FeatureLoadBalancing() {
 
 function FeatureMCP() {
   const { iconRef, handlers } = useAnimatedIcon()
+  const f = featureByKey.mcp
   return (
     <Card className="p-6" {...handlers}>
       <div className="px-4">
         <TerminalIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{features[5].title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{features[5].description}</p>
+        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
       </div>
     </Card>
   )
@@ -135,12 +164,13 @@ function FeatureMCP() {
 
 function FeatureSecurity() {
   const { iconRef, handlers } = useAnimatedIcon()
+  const f = featureByKey.security
   return (
     <Card className="p-6" {...handlers}>
       <div className="px-4">
         <LockIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{features[6].title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{features[6].description}</p>
+        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
       </div>
     </Card>
   )
@@ -158,6 +188,7 @@ export function FeaturesSection() {
           provider integrations.
         </p>
         <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <FeatureFree />
           <FeatureRouting />
           <FeatureCost />
           <FeatureKeys />
