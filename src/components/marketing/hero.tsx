@@ -13,10 +13,10 @@ function buildCodeExamples(host: string) {
       id: "curl",
       label: "cURL",
       code: `curl ${host}/api/v1/chat/completions \\
-  -H "Authorization: Bearer pk_your_key" \\
+  -H "Authorization: Bearer ak-user-YOUR_PLATFORM_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "gpt-4o",
+    "model": "keyhub/free",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'`,
     },
@@ -27,11 +27,11 @@ function buildCodeExamples(host: string) {
 
 client = OpenAI(
     base_url="${host}/api/v1",
-    api_key="pk_your_key",
+    api_key="ak-user-YOUR_PLATFORM_KEY",
 )
 
 response = client.chat.completions.create(
-    model="gpt-4o",
+    model="keyhub/free",
     messages=[{"role": "user", "content": "Hello!"}],
 )
 print(response.choices[0].message.content)`,
@@ -43,11 +43,11 @@ print(response.choices[0].message.content)`,
 
 const client = new OpenAI({
   baseURL: "${host}/api/v1",
-  apiKey: "pk_your_key",
+  apiKey: "ak-user-YOUR_PLATFORM_KEY",
 });
 
 const response = await client.chat.completions.create({
-  model: "gpt-4o",
+  model: "keyhub/free",
   messages: [{ role: "user", content: "Hello!" }],
 });
 console.log(response.choices[0].message.content);`,
@@ -64,14 +64,14 @@ import (
 )
 
 func main() {
-  config := openai.DefaultConfig("pk_your_key")
+  config := openai.DefaultConfig("ak-user-YOUR_PLATFORM_KEY")
   config.BaseURL = "${host}/api/v1"
   client := openai.NewClientWithConfig(config)
 
   resp, _ := client.CreateChatCompletion(
     context.Background(),
     openai.ChatCompletionRequest{
-      Model: "gpt-4o",
+      Model: "keyhub/free",
       Messages: []openai.ChatCompletionMessage{
         {Role: "user", Content: "Hello!"},
       },
@@ -86,13 +86,13 @@ func main() {
       code: `require "openai"
 
 client = OpenAI::Client.new(
-  access_token: "pk_your_key",
+  access_token: "ak-user-YOUR_PLATFORM_KEY",
   uri_base: "${host}/api/v1",
 )
 
 response = client.chat(
   parameters: {
-    model: "gpt-4o",
+    model: "keyhub/free",
     messages: [{ role: "user", content: "Hello!" }],
   },
 )

@@ -13,14 +13,13 @@ const KEYHUB_URL = (process.env.KEYHUB_URL ?? "http://localhost:3000").replace(
   ""
 );
 const KEYHUB_API_KEY = process.env.KEYHUB_API_KEY ?? "";
-const KEYHUB_SESSION_TOKEN = process.env.KEYHUB_SESSION_TOKEN ?? "";
 
 // ---------------------------------------------------------------------------
-// HTTP helpers
+// HTTP helper — single auth method for all endpoints
 // ---------------------------------------------------------------------------
 
-/** Call the KeyHub OpenAI-compatible proxy (uses platform API key). */
-async function proxyFetch(
+/** Call any KeyHub API using the platform API key (Bearer token). */
+async function apiFetch(
   path: string,
   options: RequestInit = {}
 ): Promise<Response> {
@@ -34,28 +33,13 @@ async function proxyFetch(
   });
 }
 
-/** Call an internal KeyHub dashboard/management API (uses session cookie). */
-async function dashboardFetch(
-  path: string,
-  options: RequestInit = {}
-): Promise<Response> {
-  return fetch(`${KEYHUB_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Cookie: `authjs.session-token=${KEYHUB_SESSION_TOKEN}`,
-      ...(options.headers as Record<string, string> | undefined),
-    },
-  });
-}
-
 // ---------------------------------------------------------------------------
 // MCP Server
 // ---------------------------------------------------------------------------
 
 const server = new McpServer({
   name: "keyhub",
-  version: "0.1.0",
+  version: "0.2.0",
 });
 
 // ---- Tool: chat ----
@@ -100,7 +84,7 @@ server.tool(
       if (temperature !== undefined) body.temperature = temperature;
       if (max_tokens !== undefined) body.max_tokens = max_tokens;
 
-      const res = await proxyFetch("/api/v1/chat/completions", {
+      const res = await apiFetch("/api/v1/chat/completions", {
         method: "POST",
         headers,
         body: JSON.stringify(body),
@@ -136,7 +120,7 @@ server.tool(
   {},
   async () => {
     try {
-      const res = await proxyFetch("/api/v1/models");
+      const res = await apiFetch("/api/v1/models");
       if (!res.ok) {
         return { content: [{ type: "text" as const, text: `Error ${res.status}: ${await res.text()}` }] };
       }
@@ -184,7 +168,7 @@ server.tool(
   },
   async ({ days }) => {
     try {
-      const res = await dashboardFetch(`/api/dashboard?days=${days}`);
+      const res = await apiFetch(`/api/dashboard?days=${days}`);
       if (!res.ok) {
         return { content: [{ type: "text" as const, text: `Error ${res.status}: ${await res.text()}` }] };
       }
@@ -192,20 +176,23 @@ server.tool(
 
       let text = `# KeyHub Dashboard (${days} days)\n\n`;
       text += `| Metric | Value |\n|---|---|\n`;
-      text += `| Total Spend | $${Number(d.totalSpend ?? 0).toFixed(4)} |\n`;
+      text += `| Monthly Spend | $${Number(d.monthSpend ?? 0).toFixed(4)} |\n`;
       text += `| Total Requests | ${d.totalRequests ?? 0} |\n`;
+      text += `| Success Rate | ${d.successRate ?? 0}% |\n`;
       text += `| Avg Latency | ${d.avgLatency ?? 0}ms |\n`;
-      text += `| P95 Latency | ${d.p95Latency ?? 0}ms |\n`;
-      text += `| Active Keys | ${d.activeKeys ?? 0} |\n`;
-      text += `| Error Rate | ${Number(d.errorRate ?? 0).toFixed(1)}% |\n`;
+
+      if (d.latencyPercentiles) {
+        text += `| P50 Latency | ${d.latencyPercentiles.p50 ?? 0}ms |\n`;
+        text += `| P95 Latency | ${d.latencyPercentiles.p95 ?? 0}ms |\n`;
+        text += `| P99 Latency | ${d.latencyPercentiles.p99 ?? 0}ms |\n`;
+      }
 
       if (d.costForecast) {
         text += `\n## Cost Forecast\n`;
         text += `- Projected monthly: $${Number(d.costForecast.projected ?? 0).toFixed(4)}\n`;
-        text += `- Daily avg: $${Number(d.costForecast.dailyAvg ?? 0).toFixed(4)}\n`;
-        if (d.costForecast.budgetLimit) {
-          text += `- Budget limit: $${d.costForecast.budgetLimit}\n`;
-          text += `- Budget used: ${Number(d.costForecast.budgetPct ?? 0).toFixed(1)}%\n`;
+        text += `- Confidence: ${d.costForecast.confidence ?? 0}%\n`;
+        if (d.costForecast.overBudget) {
+          text += `- ⚠️ Over budget by $${Math.abs(d.costForecast.delta ?? 0).toFixed(4)}\n`;
         }
       }
 
@@ -265,7 +252,7 @@ server.tool(
       if (model) params.set("model", model);
       if (search) params.set("search", search);
 
-      const res = await dashboardFetch(`/api/logs?${params}`);
+      const res = await apiFetch(`/api/logs?${params}`);
       if (!res.ok) {
         return { content: [{ type: "text" as const, text: `Error ${res.status}: ${await res.text()}` }] };
       }
@@ -312,7 +299,7 @@ server.tool(
   },
   async ({ days }) => {
     try {
-      const res = await dashboardFetch(`/api/usage?days=${days}`);
+      const res = await apiFetch(`/api/usage?days=${days}`);
       if (!res.ok) {
         return { content: [{ type: "text" as const, text: `Error ${res.status}: ${await res.text()}` }] };
       }
@@ -349,11 +336,11 @@ server.tool(
 // ---------------------------------------------------------------------------
 
 async function main() {
-  if (!KEYHUB_API_KEY && !KEYHUB_SESSION_TOKEN) {
+  if (!KEYHUB_API_KEY) {
     console.error(
-      "Warning: Neither KEYHUB_API_KEY nor KEYHUB_SESSION_TOKEN is set.\n" +
-        "Set KEYHUB_API_KEY for chat/models tools, KEYHUB_SESSION_TOKEN for dashboard/logs/usage tools.\n" +
-        "See https://github.com/your-org/keyhub#mcp-server for setup instructions."
+      "Warning: KEYHUB_API_KEY is not set.\n" +
+        "Set it to your KeyHub platform API key (ak-user-...) to enable all tools.\n" +
+        "Generate one at your KeyHub instance → Platform Keys page."
     );
   }
 

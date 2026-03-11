@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
+import { resolveUserId } from '@/lib/api-auth'
 
 export async function GET(req: Request) {
-  const session = await auth()
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = await resolveUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 
     // Build WHERE conditions
     const conditions: string[] = [`r."userId" = $1`]
-    const params: any[] = [session.user.id]
+    const params: any[] = [userId]
     let paramIndex = 2
 
     // Full-text search condition
@@ -126,7 +126,7 @@ export async function GET(req: Request) {
   }
 
   // Standard Prisma query (no full-text search)
-  const where: any = { userId: session.user.id }
+  const where: any = { userId: userId }
   if (provider) where.provider = provider
   if (status) where.status = status
   if (model) where.model = model

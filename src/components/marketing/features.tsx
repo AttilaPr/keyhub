@@ -8,7 +8,6 @@ import { ShieldCheckIcon } from "@/components/ui/shield-check"
 import { ChartColumnIncreasingIcon } from "@/components/ui/chart-column-increasing"
 import { LayersIcon } from "@/components/ui/layers"
 import { LockIcon } from "@/components/ui/lock"
-import { TerminalIcon } from "@/components/ui/terminal"
 import { SparklesIcon } from "@/components/ui/sparkles"
 
 const features = [
@@ -47,12 +46,6 @@ const features = [
     title: "Smart Load Balancing",
     description:
       "Automatic failover between providers with round-robin, least-latency, and weighted routing.",
-  },
-  {
-    key: "mcp",
-    title: "MCP Protocol",
-    description:
-      "Built-in MCP server lets AI assistants like Claude use your KeyHub gateway for chat, usage monitoring, and log analysis.",
   },
   {
     key: "security",
@@ -148,20 +141,6 @@ function FeatureLoadBalancing() {
   )
 }
 
-function FeatureMCP() {
-  const { iconRef, handlers } = useAnimatedIcon()
-  const f = featureByKey.mcp
-  return (
-    <Card className="p-6" {...handlers}>
-      <div className="px-4">
-        <TerminalIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
-      </div>
-    </Card>
-  )
-}
-
 function FeatureSecurity() {
   const { iconRef, handlers } = useAnimatedIcon()
   const f = featureByKey.security
@@ -194,7 +173,6 @@ export function FeaturesSection() {
           <FeatureKeys />
           <FeatureAnalytics />
           <FeatureLoadBalancing />
-          <FeatureMCP />
           <FeatureSecurity />
         </div>
       </div>

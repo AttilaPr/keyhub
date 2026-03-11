@@ -12,7 +12,6 @@ import { CheckIcon } from '@/components/ui/check'
 import { CircleCheckIcon } from '@/components/ui/circle-check'
 import { BadgeAlertIcon } from '@/components/ui/badge-alert'
 import { ArrowRightIcon } from '@/components/ui/arrow-right'
-import { TerminalIcon } from '@/components/ui/terminal'
 
 const YOUR_KEY = 'ak-user-YOUR_PLATFORM_KEY'
 const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://your-keyhub.com'
@@ -397,131 +396,6 @@ export default function DocsPage() {
         </CardContent>
       </Card>
 
-      {/* MCP Server */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-              <TerminalIcon size={18} className="text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-foreground">MCP Server</CardTitle>
-              <CardDescription>
-                Connect AI assistants like Claude directly to your KeyHub gateway using the Model Context Protocol.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-3 text-sm">
-            <p className="text-muted-foreground">
-              KeyHub ships with a built-in MCP server that exposes 5 tools to any MCP-compatible AI assistant:
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { tool: 'keyhub_chat', desc: 'Send chat completions through the gateway' },
-                { tool: 'keyhub_list_models', desc: 'List available models by provider' },
-                { tool: 'keyhub_dashboard', desc: 'View spend, requests, and latency metrics' },
-                { tool: 'keyhub_logs', desc: 'Search and filter request logs' },
-                { tool: 'keyhub_usage', desc: 'Get usage analytics and trends' },
-              ].map((t) => (
-                <div key={t.tool} className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3">
-                  <code className="text-xs text-primary font-mono whitespace-nowrap">{t.tool}</code>
-                  <span className="text-xs text-muted-foreground">{t.desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">1. Install</h3>
-            <div className="relative">
-              <pre className="rounded-lg bg-muted border border-border p-4 text-xs text-muted-foreground overflow-x-auto">
-                <code>{`cd mcp-server && npm install && npm run build`}</code>
-              </pre>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute top-2 right-2 text-muted-foreground"
-                onClick={() => copyCode('cd mcp-server && npm install && npm run build', 100)}
-              >
-                {copiedIndex === 100 ? <CheckIcon size={14} className="text-primary" /> : <CopyIcon size={14} />}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">2. Configure Claude Desktop</h3>
-            <p className="text-xs text-muted-foreground">
-              Add this to your <code className="text-foreground">claude_desktop_config.json</code>:
-            </p>
-            <div className="relative">
-              <pre className="rounded-lg bg-muted border border-border p-4 text-xs text-muted-foreground overflow-x-auto">
-                <code>{`{
-  "mcpServers": {
-    "keyhub": {
-      "command": "node",
-      "args": ["path/to/keyhub/mcp-server/dist/index.js"],
-      "env": {
-        "KEYHUB_URL": "${BASE_URL}",
-        "KEYHUB_API_KEY": "${YOUR_KEY}",
-        "KEYHUB_SESSION_TOKEN": "your-session-token"
-      }
-    }
-  }
-}`}</code>
-              </pre>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute top-2 right-2 text-muted-foreground"
-                onClick={() => copyCode(`{
-  "mcpServers": {
-    "keyhub": {
-      "command": "node",
-      "args": ["path/to/keyhub/mcp-server/dist/index.js"],
-      "env": {
-        "KEYHUB_URL": "${BASE_URL}",
-        "KEYHUB_API_KEY": "your-platform-key",
-        "KEYHUB_SESSION_TOKEN": "your-session-token"
-      }
-    }
-  }
-}`, 101)}
-              >
-                {copiedIndex === 101 ? <CheckIcon size={14} className="text-primary" /> : <CopyIcon size={14} />}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">3. Environment Variables</h3>
-            <div className="space-y-2">
-              {[
-                { name: 'KEYHUB_URL', desc: 'Your KeyHub instance URL', required: true },
-                { name: 'KEYHUB_API_KEY', desc: 'Platform API key for chat and model tools', required: true },
-                { name: 'KEYHUB_SESSION_TOKEN', desc: 'Session token for dashboard, logs, and usage tools', required: false },
-              ].map((v) => (
-                <div key={v.name} className="flex items-start gap-3 rounded-lg border border-border p-3">
-                  <code className="text-xs text-primary font-mono whitespace-nowrap">{v.name}</code>
-                  <span className="text-xs text-muted-foreground flex-1">{v.desc}</span>
-                  {v.required ? (
-                    <Badge className="bg-primary/10 text-primary text-[10px] shrink-0">Required</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-[10px] shrink-0">Optional</Badge>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border bg-muted/50 p-4">
-            <p className="text-xs text-muted-foreground">
-              <strong className="text-foreground">Tip:</strong> Once configured, ask Claude to &quot;list my available models on KeyHub&quot; or &quot;check my KeyHub spending this month&quot; to verify the connection.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
