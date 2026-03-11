@@ -13,7 +13,7 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "KeyHub - AI API Gateway",
   description:
-    "Self-hosted OpenRouter alternative. Manage provider keys, generate virtual API keys, and track usage across AI providers.",
+    "Self-hosted AI API gateway. Manage provider keys, generate virtual API keys, and track usage across AI providers.",
 };
 
 function resolveThemeClass(cookie: string | undefined): string {
