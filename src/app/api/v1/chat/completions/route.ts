@@ -2,7 +2,7 @@ import { streamText } from 'ai'
 import { NextResponse } from 'next/server'
 import { parseModel } from '@/lib/model-routing'
 import { decryptKey } from '@/lib/encryption'
-import { PROVIDERS, type ProviderName } from '@/lib/providers'
+import { PROVIDERS, type ProviderName, isPlatformFreeModel, getPlatformFreeModelKey } from '@/lib/providers'
 import { calculateCost, getModelPricing } from '@/lib/cost-calculator'
 import { verifyPlatformKey } from '@/lib/platform-key'
 import { checkUserBudget, checkKeyBudget, getPeriodEnd } from '@/lib/budget'
@@ -323,23 +323,45 @@ export async function POST(req: Request) {
     }
   }
 
-  // Fetch ALL active provider keys for load balancing
-  const providerKeys = await prisma.providerKey.findMany({
-    where: { userId: platformKey.userId, provider, isActive: true },
-  })
+  // Check if this is a platform-provided free model
+  const fullModelName = `${provider}/${modelId}`
+  const isFreeModel = isPlatformFreeModel(fullModelName)
 
-  if (providerKeys.length === 0) {
-    return NextResponse.json(
-      { error: `No ${provider} key found. Add one in your dashboard.` },
-      { status: 400 }
-    )
+  let providerKey: { id: string; encryptedKey: string; latencyEma: number | null } | null = null
+  let apiKey: string
+  let actualModelId = modelId
+
+  if (isFreeModel) {
+    const platformApiKey = getPlatformFreeModelKey(fullModelName)
+    if (!platformApiKey) {
+      return NextResponse.json(
+        { error: 'Free model is not configured on this platform' },
+        { status: 503 }
+      )
+    }
+    apiKey = platformApiKey
+    // OpenRouter expects the full model ID (e.g. "openrouter/free")
+    actualModelId = fullModelName
+  } else {
+    // Fetch ALL active provider keys for load balancing
+    const providerKeys = await prisma.providerKey.findMany({
+      where: { userId: platformKey.userId, provider, isActive: true },
+    })
+
+    if (providerKeys.length === 0) {
+      return NextResponse.json(
+        { error: `No ${provider} key found. Add one in your dashboard.` },
+        { status: 400 }
+      )
+    }
+
+    // Select provider key based on platform key's routing strategy
+    const routingStrategy = (platformKey as any).routingStrategy || 'round-robin'
+    const selected = selectProviderKey(providerKeys, routingStrategy)
+    providerKey = selected
+    apiKey = decryptKey(selected.encryptedKey)
   }
 
-  // Select provider key based on platform key's routing strategy
-  const routingStrategy = (platformKey as any).routingStrategy || 'round-robin'
-  const providerKey = selectProviderKey(providerKeys, routingStrategy)
-
-  const apiKey = decryptKey(providerKey.encryptedKey)
   const createProvider = PROVIDERS[provider as ProviderName]
   const providerInstance = createProvider(apiKey)
 
@@ -352,15 +374,15 @@ export async function POST(req: Request) {
   try {
     const { result: streamResult, retryCount: retries } = await withRetry(async () => {
       return streamText({
-        model: providerInstance(modelId),
+        model: providerInstance(actualModelId),
         messages: messages as any,
         onFinish: async ({ usage, text }) => {
           const promptTokens = (usage as any)?.promptTokens ?? (usage as any)?.inputTokens ?? 0
           const completionTokens = (usage as any)?.completionTokens ?? (usage as any)?.outputTokens ?? 0
-          const costUsd = calculateCost(modelId, promptTokens, completionTokens)
+          const costUsd = isFreeModel ? 0 : calculateCost(modelId, promptTokens, completionTokens)
 
           // Post-request cost check — log warning if total cost exceeds maxCostPerRequest
-          if (platformKey.maxCostPerRequest && costUsd > platformKey.maxCostPerRequest) {
+          if (!isFreeModel && platformKey.maxCostPerRequest && costUsd > platformKey.maxCostPerRequest) {
             console.warn(
               `[cost-warning] Request cost $${costUsd.toFixed(6)} exceeded maxCostPerRequest $${platformKey.maxCostPerRequest} for platform key ${platformKey.id}`
             )
@@ -371,7 +393,7 @@ export async function POST(req: Request) {
               requestId,
               userId: platformKey.userId,
               platformKeyId: platformKey.id,
-              providerKeyId: providerKey.id,
+              providerKeyId: providerKey?.id ?? null,
               provider,
               model: modelId,
               promptTokens,
@@ -392,13 +414,15 @@ export async function POST(req: Request) {
             data: { lastUsedAt: new Date() },
           })
 
-          // Update latency EMA on the provider key
-          const latencyMs = Date.now() - start
-          const newEma = updateLatencyEma(latencyMs, providerKey.latencyEma)
-          prisma.providerKey.update({
-            where: { id: providerKey.id },
-            data: { latencyEma: newEma },
-          }).catch(() => {})
+          // Update latency EMA on the provider key (skip for free models)
+          if (providerKey) {
+            const latencyMs = Date.now() - start
+            const newEma = updateLatencyEma(latencyMs, providerKey.latencyEma)
+            prisma.providerKey.update({
+              where: { id: providerKey.id },
+              data: { latencyEma: newEma },
+            }).catch(() => {})
+          }
 
           // Asynchronous budget check after successful logging
           triggerBudgetCheck(platformKey.userId, platformKey.id)
@@ -521,7 +545,7 @@ export async function POST(req: Request) {
         requestId,
         userId: platformKey.userId,
         platformKeyId: platformKey.id,
-        providerKeyId: providerKey.id,
+        providerKeyId: providerKey?.id ?? null,
         provider,
         model: modelId,
         promptTokens: 0,

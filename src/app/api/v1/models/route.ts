@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { verifyPlatformKey } from '@/lib/platform-key'
 import { ensurePricingLoaded, getModelsByProvider } from '@/lib/cost-calculator'
+import { PLATFORM_FREE_MODELS } from '@/lib/providers'
 import prisma from '@/lib/prisma'
 
 export async function GET(req: Request) {
@@ -37,6 +38,17 @@ export async function GET(req: Request) {
 
   const activeProviders = providerKeys.map((k) => k.provider)
   const models: { id: string; object: string; owned_by: string }[] = []
+
+  // Add platform-provided free models (available to everyone)
+  for (const [modelId, config] of Object.entries(PLATFORM_FREE_MODELS)) {
+    if (process.env[config.envKey]) {
+      models.push({
+        id: modelId,
+        object: 'model',
+        owned_by: 'keyhub',
+      })
+    }
+  }
 
   for (const provider of activeProviders) {
     const providerModels = allModels[provider] || []

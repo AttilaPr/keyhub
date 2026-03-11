@@ -52,6 +52,7 @@ interface ModelGroup {
 
 // Models fetched dynamically from /api/models
 const FALLBACK_MODELS: ModelGroup[] = [
+  { provider: 'KeyHub Free', key: 'openrouter', models: ['openrouter/free'] },
   { provider: 'OpenAI', key: 'openai', models: ['openai/gpt-4o', 'openai/gpt-4o-mini'] },
   { provider: 'Anthropic', key: 'anthropic', models: ['anthropic/claude-3-5-sonnet-20241022'] },
   { provider: 'Google', key: 'google', models: ['google/gemini-2.0-flash'] },
@@ -383,10 +384,11 @@ export default function PlaygroundPage() {
             </SelectTrigger>
             <SelectContent>
               {allModels.map((group) => {
-                const isActive = activeProviders.has(group.key)
+                const isFree = group.key === 'openrouter'
+                const isActive = isFree || activeProviders.has(group.key)
                 return group.models.map((m) => (
                   <SelectItem key={m} value={m} disabled={!isActive}>
-                    {m}{!isActive ? ' (no key)' : ''}
+                    {m}{isFree ? ' (free)' : !isActive ? ' (no key)' : ''}
                   </SelectItem>
                 ))
               })}

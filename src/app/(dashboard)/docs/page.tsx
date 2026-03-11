@@ -85,6 +85,7 @@ console.log(text)`,
 
 // Fallback — replaced dynamically from /api/models on mount
 const FALLBACK_MODELS = [
+  { provider: 'KeyHub Free', key: 'openrouter', models: ['openrouter/free'] },
   { provider: 'OpenAI', key: 'openai', models: ['openai/gpt-4o', 'openai/gpt-4o-mini'] },
   { provider: 'Anthropic', key: 'anthropic', models: ['anthropic/claude-3-5-sonnet-20241022'] },
   { provider: 'Google', key: 'google', models: ['google/gemini-2.0-flash'] },
@@ -317,13 +318,14 @@ export default function DocsPage() {
         <CardHeader>
           <CardTitle className="text-foreground">Available Models</CardTitle>
           <CardDescription>
-            Models are available based on which provider keys you have added.
+            Models are available based on which provider keys you have added. The KeyHub Free model is available to all users at no cost.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
             {models.map((group) => {
-              const isActive = activeProviders.has(group.key)
+              const isFree = group.key === 'openrouter'
+              const isActive = isFree || activeProviders.has(group.key)
               return (
                 <div key={group.provider}>
                   <div className="flex items-center gap-2 mb-2">
@@ -333,7 +335,9 @@ export default function DocsPage() {
                       <BadgeAlertIcon size={16} className="text-muted-foreground" />
                     )}
                     <h3 className="text-sm font-medium text-muted-foreground">{group.provider}</h3>
-                    {isActive ? (
+                    {isFree ? (
+                      <Badge className="bg-lime-400/10 text-lime-400 text-[10px]">Free</Badge>
+                    ) : isActive ? (
                       <Badge className="bg-primary/10 text-primary text-[10px]">Configured</Badge>
                     ) : (
                       <a href="/provider-keys" className="text-[10px] text-muted-foreground hover:text-primary transition-colors">
@@ -341,6 +345,11 @@ export default function DocsPage() {
                       </a>
                     )}
                   </div>
+                  {isFree && (
+                    <p className="text-xs text-muted-foreground mb-2 max-w-2xl">
+                      Free AI model powered by KeyHub. Routes requests to available free models with smart filtering based on your needs — supports text, image understanding, tool calling, and structured outputs. 200K context window. Zero cost.
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {group.models.map((model) => (
                       <code

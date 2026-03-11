@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { parseModel } from '@/lib/model-routing'
 import { decryptKey } from '@/lib/encryption'
-import { PROVIDERS, type ProviderName } from '@/lib/providers'
+import { PROVIDERS, type ProviderName, isPlatformFreeModel, getPlatformFreeModelKey } from '@/lib/providers'
 import { calculateCost } from '@/lib/cost-calculator'
 import prisma from '@/lib/prisma'
 
@@ -40,32 +40,49 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Unsupported provider: ${provider}` }, { status: 400 })
   }
 
-  const providerKey = await prisma.providerKey.findFirst({
-    where: { userId: session.user.id, provider, isActive: true },
-  })
+  const fullModelName = `${provider}/${modelId}`
+  const isFreeModel = isPlatformFreeModel(fullModelName)
 
-  if (!providerKey) {
-    return NextResponse.json({ error: `No ${provider} key configured` }, { status: 400 })
+  let providerKey: { id: string } | null = null
+  let apiKey: string
+  let actualModelId = modelId
+
+  if (isFreeModel) {
+    const platformApiKey = getPlatformFreeModelKey(fullModelName)
+    if (!platformApiKey) {
+      return NextResponse.json({ error: 'Free model is not configured on this platform' }, { status: 503 })
+    }
+    apiKey = platformApiKey
+    actualModelId = fullModelName
+  } else {
+    const pk = await prisma.providerKey.findFirst({
+      where: { userId: session.user.id, provider, isActive: true },
+    })
+
+    if (!pk) {
+      return NextResponse.json({ error: `No ${provider} key configured` }, { status: 400 })
+    }
+    providerKey = pk
+    apiKey = decryptKey(pk.encryptedKey)
   }
 
-  const apiKey = decryptKey(providerKey.encryptedKey)
   const createProvider = PROVIDERS[provider as ProviderName]
   const providerInstance = createProvider(apiKey)
 
   try {
     const streamOpts: Parameters<typeof streamText>[0] = {
-      model: providerInstance(modelId),
+      model: providerInstance(actualModelId),
       messages: messages as any,
       onFinish: async ({ usage, text }) => {
         const promptTokens = (usage as any)?.promptTokens ?? (usage as any)?.inputTokens ?? 0
         const completionTokens = (usage as any)?.completionTokens ?? (usage as any)?.outputTokens ?? 0
-        const costUsd = calculateCost(modelId, promptTokens, completionTokens)
+        const costUsd = isFreeModel ? 0 : calculateCost(modelId, promptTokens, completionTokens)
 
         await prisma.requestLog.create({
           data: {
             userId: session.user.id,
             platformKeyId: platformKey.id,
-            providerKeyId: providerKey.id,
+            providerKeyId: providerKey?.id ?? null,
             provider,
             model: modelId,
             promptTokens,
