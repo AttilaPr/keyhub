@@ -25,14 +25,13 @@ export async function GET() {
     .map(([model]) => model)
 
   if (freeModels.length > 0) {
-    const existing = providers.find((p) => p.key === 'openrouter')
+    const existing = providers.find((p) => p.key === 'keyhub')
     if (existing) {
-      // Prepend free models to the existing openrouter group
       existing.models = [...freeModels, ...existing.models]
     } else {
       providers.unshift({
-        key: 'openrouter',
-        label: PROVIDER_LABELS['openrouter'] || 'KeyHub Free',
+        key: 'keyhub',
+        label: PROVIDER_LABELS['keyhub'] || 'KeyHub Free',
         models: freeModels,
       })
     }

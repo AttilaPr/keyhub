@@ -2,7 +2,7 @@ import { streamText } from 'ai'
 import { NextResponse } from 'next/server'
 import { parseModel } from '@/lib/model-routing'
 import { decryptKey } from '@/lib/encryption'
-import { PROVIDERS, type ProviderName, isPlatformFreeModel, getPlatformFreeModelKey } from '@/lib/providers'
+import { PROVIDERS, type ProviderName, isPlatformFreeModel, getPlatformFreeModelConfig } from '@/lib/providers'
 import { calculateCost, getModelPricing } from '@/lib/cost-calculator'
 import { verifyPlatformKey } from '@/lib/platform-key'
 import { checkUserBudget, checkKeyBudget, getPeriodEnd } from '@/lib/budget'
@@ -332,16 +332,16 @@ export async function POST(req: Request) {
   let actualModelId = modelId
 
   if (isFreeModel) {
-    const platformApiKey = getPlatformFreeModelKey(fullModelName)
-    if (!platformApiKey) {
+    const freeConfig = getPlatformFreeModelConfig(fullModelName)
+    if (!freeConfig) {
       return NextResponse.json(
         { error: 'Free model is not configured on this platform' },
         { status: 503 }
       )
     }
-    apiKey = platformApiKey
-    // OpenRouter expects the full model ID (e.g. "openrouter/free")
-    actualModelId = fullModelName
+    apiKey = freeConfig.apiKey
+    // Map keyhub/free → openrouter/free for the actual API call
+    actualModelId = freeConfig.actualModel
   } else {
     // Fetch ALL active provider keys for load balancing
     const providerKeys = await prisma.providerKey.findMany({

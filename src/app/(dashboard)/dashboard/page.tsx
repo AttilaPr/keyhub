@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
+import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -190,6 +192,63 @@ export default function DashboardPage() {
           </Select>
         </div>
       </div>
+
+      {/* Getting Started Card */}
+      {data.totalRequests === 0 && (
+        <Card className="border-lime-400/20 bg-lime-400/5">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-lime-400/10">
+                <span className="text-lg">🚀</span>
+              </div>
+              <div>
+                <CardTitle className="text-foreground">Get Started with KeyHub</CardTitle>
+                <CardDescription>Start using AI models in minutes</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-lime-400/20 bg-background/50 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-lime-400/10 text-lime-400 text-[10px]">Free</Badge>
+                  <span className="text-sm font-medium text-foreground">Try it now</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Use <code className="text-lime-400">keyhub/free</code> in the Playground — no API keys or setup needed. Zero cost, 200K context, supports images and tool calling.
+                </p>
+                <Button size="sm" variant="outline" className="border-lime-400/30 text-lime-400 hover:bg-lime-400/10" render={<Link href="/playground" />}>
+                  Open Playground
+                </Button>
+              </div>
+              <div className="rounded-lg border border-border bg-background/50 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="text-[10px]">Step 1</Badge>
+                  <span className="text-sm font-medium text-foreground">Add provider keys</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Connect your OpenAI, Anthropic, Google, or Mistral API keys to unlock all premium models.
+                </p>
+                <Button size="sm" variant="outline" render={<Link href="/provider-keys" />}>
+                  Provider Keys
+                </Button>
+              </div>
+              <div className="rounded-lg border border-border bg-background/50 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="text-[10px]">Step 2</Badge>
+                  <span className="text-sm font-medium text-foreground">Create platform keys</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Generate API keys for your apps. Use <code className="text-primary">provider/model</code> format (e.g. <code className="text-primary">openai/gpt-4o</code>).
+                </p>
+                <Button size="sm" variant="outline" render={<Link href="/platform-keys" />}>
+                  Platform Keys
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPI Cards - non-removable */}
       {isVisible('kpi-cards') && (

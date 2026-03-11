@@ -52,7 +52,7 @@ interface ModelGroup {
 
 // Models fetched dynamically from /api/models
 const FALLBACK_MODELS: ModelGroup[] = [
-  { provider: 'KeyHub Free', key: 'openrouter', models: ['openrouter/free'] },
+  { provider: 'KeyHub Free', key: 'keyhub', models: ['keyhub/free'] },
   { provider: 'OpenAI', key: 'openai', models: ['openai/gpt-4o', 'openai/gpt-4o-mini'] },
   { provider: 'Anthropic', key: 'anthropic', models: ['anthropic/claude-3-5-sonnet-20241022'] },
   { provider: 'Google', key: 'google', models: ['google/gemini-2.0-flash'] },
@@ -84,7 +84,7 @@ function persistSessions(sessions: SavedSession[]) {
 export default function PlaygroundPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [model, setModel] = useState('openrouter/free')
+  const [model, setModel] = useState('keyhub/free')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
   const [streaming, setStreaming] = useState(false)
@@ -174,7 +174,7 @@ export default function PlaygroundPage() {
   async function handleSend() {
     if (!input.trim() || streaming) return
 
-    const isFree = model === 'openrouter/free'
+    const isFree = model === 'keyhub/free'
     if (!isFree && !selectedKeyId) {
       addToast({ title: 'No key selected', description: 'Select a platform key to use', variant: 'destructive' })
       return
@@ -385,7 +385,7 @@ export default function PlaygroundPage() {
             </SelectTrigger>
             <SelectContent>
               {allModels.map((group) => {
-                const isFree = group.key === 'openrouter'
+                const isFree = group.key === 'keyhub'
                 const isActive = isFree || activeProviders.has(group.key)
                 return group.models.map((m) => (
                   <SelectItem key={m} value={m} disabled={!isActive}>
@@ -565,7 +565,7 @@ export default function PlaygroundPage() {
                 <Square className="h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={handleSend} disabled={!input.trim() || (model !== 'openrouter/free' && !selectedKeyId)}>
+              <Button onClick={handleSend} disabled={!input.trim() || (model !== 'keyhub/free' && !selectedKeyId)}>
                 <SendIcon size={16} />
               </Button>
             )}

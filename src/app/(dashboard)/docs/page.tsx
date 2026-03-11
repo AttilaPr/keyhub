@@ -85,7 +85,7 @@ console.log(text)`,
 
 // Fallback — replaced dynamically from /api/models on mount
 const FALLBACK_MODELS = [
-  { provider: 'KeyHub Free', key: 'openrouter', models: ['openrouter/free'] },
+  { provider: 'KeyHub Free', key: 'keyhub', models: ['keyhub/free'] },
   { provider: 'OpenAI', key: 'openai', models: ['openai/gpt-4o', 'openai/gpt-4o-mini'] },
   { provider: 'Anthropic', key: 'anthropic', models: ['anthropic/claude-3-5-sonnet-20241022'] },
   { provider: 'Google', key: 'google', models: ['google/gemini-2.0-flash'] },
@@ -324,7 +324,7 @@ export default function DocsPage() {
         <CardContent>
           <div className="space-y-6">
             {models.map((group) => {
-              const isFree = group.key === 'openrouter'
+              const isFree = group.key === 'keyhub'
               const isActive = isFree || activeProviders.has(group.key)
               return (
                 <div key={group.provider}>

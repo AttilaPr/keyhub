@@ -8,7 +8,7 @@ export const PROVIDERS = {
   anthropic: (key: string) => createAnthropic({ apiKey: key }),
   google: (key: string) => createGoogleGenerativeAI({ apiKey: key }),
   mistral: (key: string) => createMistral({ apiKey: key }),
-  openrouter: (key: string) =>
+  keyhub: (key: string) =>
     createOpenAI({ apiKey: key, baseURL: 'https://openrouter.ai/api/v1' }),
 } as const
 
@@ -19,16 +19,17 @@ export const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   google: 'Google',
   mistral: 'Mistral',
-  openrouter: 'KeyHub Free',
+  keyhub: 'KeyHub Free',
 }
 
 /**
  * Platform-provided free models that all users can access without their own provider key.
  * The platform uses its own API key (from env vars) for these models.
  */
-export const PLATFORM_FREE_MODELS: Record<string, { envKey: string; description: string }> = {
-  'openrouter/free': {
+export const PLATFORM_FREE_MODELS: Record<string, { envKey: string; openRouterModel: string; description: string }> = {
+  'keyhub/free': {
     envKey: 'OPENRUTER_API_KEY',
+    openRouterModel: 'openrouter/free',
     description:
       'Free AI model powered by KeyHub. Routes requests to available free models with smart filtering based on your needs — supports text, image understanding, tool calling, and structured outputs. 200K context window. Zero cost.',
   },
@@ -39,11 +40,13 @@ export function isPlatformFreeModel(model: string): boolean {
   return model in PLATFORM_FREE_MODELS
 }
 
-/** Get the API key for a platform-provided free model from env vars */
-export function getPlatformFreeModelKey(model: string): string | null {
+/** Get the API key and actual model ID for a platform-provided free model */
+export function getPlatformFreeModelConfig(model: string): { apiKey: string; actualModel: string } | null {
   const config = PLATFORM_FREE_MODELS[model]
   if (!config) return null
-  return process.env[config.envKey] || null
+  const apiKey = process.env[config.envKey]
+  if (!apiKey) return null
+  return { apiKey, actualModel: config.openRouterModel }
 }
 
 import { getModelsByProvider } from '@/lib/cost-calculator'

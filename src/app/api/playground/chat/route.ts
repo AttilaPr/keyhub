@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { parseModel } from '@/lib/model-routing'
 import { decryptKey } from '@/lib/encryption'
-import { PROVIDERS, type ProviderName, isPlatformFreeModel, getPlatformFreeModelKey } from '@/lib/providers'
+import { PROVIDERS, type ProviderName, isPlatformFreeModel, getPlatformFreeModelConfig } from '@/lib/providers'
 import { calculateCost } from '@/lib/cost-calculator'
 import prisma from '@/lib/prisma'
 
@@ -51,12 +51,12 @@ export async function POST(req: Request) {
   let actualModelId = modelId
 
   if (isFreeModel) {
-    const platformApiKey = getPlatformFreeModelKey(fullModelName)
-    if (!platformApiKey) {
+    const freeConfig = getPlatformFreeModelConfig(fullModelName)
+    if (!freeConfig) {
       return NextResponse.json({ error: 'Free model is not configured on this platform' }, { status: 503 })
     }
-    apiKey = platformApiKey
-    actualModelId = fullModelName
+    apiKey = freeConfig.apiKey
+    actualModelId = freeConfig.actualModel
   } else {
     const pk = await prisma.providerKey.findFirst({
       where: { userId: session.user.id, provider, isActive: true },
