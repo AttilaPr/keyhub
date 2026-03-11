@@ -84,7 +84,7 @@ function persistSessions(sessions: SavedSession[]) {
 export default function PlaygroundPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [model, setModel] = useState('openai/gpt-4o-mini')
+  const [model, setModel] = useState('openrouter/free')
   const [systemPrompt, setSystemPrompt] = useState('')
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
   const [streaming, setStreaming] = useState(false)
