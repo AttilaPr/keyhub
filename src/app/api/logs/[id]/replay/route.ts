@@ -11,10 +11,13 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const { id } = await params
 
-  const log = await prisma.requestLog.findUnique({
-    where: { id, userId: session.user.id },
+  const log = await prisma.requestLog.findFirst({
+    where: { id, ...scope },
     select: {
       id: true,
       userId: true,

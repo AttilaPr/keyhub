@@ -6,12 +6,13 @@ export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const userId = session.user.id
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
 
   const [providerKeyCount, platformKeyCount, requestCount] = await Promise.all([
-    prisma.providerKey.count({ where: { userId, isActive: true } }),
-    prisma.platformKey.count({ where: { userId } }),
-    prisma.requestLog.count({ where: { userId } }),
+    prisma.providerKey.count({ where: { ...scope, isActive: true } }),
+    prisma.platformKey.count({ where: { ...scope } }),
+    prisma.requestLog.count({ where: { ...scope } }),
   ])
 
   return NextResponse.json({

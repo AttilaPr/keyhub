@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
-import { resolveUserId } from '@/lib/api-auth'
+import { resolveContext, scopeWhere } from '@/lib/api-auth'
 
 export async function GET(req: Request) {
-  const userId = await resolveUserId(req)
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = await resolveContext(req)
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const userId = ctx.userId
+  const scope = scopeWhere(ctx)
+  const sqlScope = ctx.orgId
+    ? Prisma.sql`"orgId" = ${ctx.orgId}`
+    : Prisma.sql`"userId" = ${userId} AND "orgId" IS NULL`
 
   const { searchParams } = new URL(req.url)
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
@@ -34,8 +41,12 @@ export async function GET(req: Request) {
     }
 
     // Build WHERE conditions
-    const conditions: string[] = [`r."userId" = $1`]
-    const params: any[] = [userId]
+    const conditions: string[] = [
+      ctx.orgId
+        ? `r."orgId" = $1`
+        : `r."userId" = $1 AND r."orgId" IS NULL`
+    ]
+    const params: any[] = [ctx.orgId ? ctx.orgId : userId]
     let paramIndex = 2
 
     // Full-text search condition
@@ -126,7 +137,7 @@ export async function GET(req: Request) {
   }
 
   // Standard Prisma query (no full-text search)
-  const where: any = { userId: userId }
+  const where: any = { ...scope }
   if (provider) where.provider = provider
   if (status) where.status = status
   if (model) where.model = model

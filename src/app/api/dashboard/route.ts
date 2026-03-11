@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
-import { resolveUserId } from '@/lib/api-auth'
+import { resolveContext, scopeWhere } from '@/lib/api-auth'
 
 export async function GET(req: Request) {
-  const userId = await resolveUserId(req)
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = await resolveContext(req)
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const userId = ctx.userId
+  const scope = scopeWhere(ctx)
+  // SQL fragment for raw queries: either orgId filter or userId+orgId IS NULL
+  const sqlScope = ctx.orgId
+    ? Prisma.sql`"orgId" = ${ctx.orgId}`
+    : Prisma.sql`"userId" = ${userId} AND "orgId" IS NULL`
 
   const { searchParams } = new URL(req.url)
   const days = Math.min(Math.max(parseInt(searchParams.get('days') || '30', 10) || 30, 1), 365)
@@ -31,17 +39,17 @@ export async function GET(req: Request) {
     monthDailyCosts,
   ] = await Promise.all([
     prisma.requestLog.aggregate({
-      where: { userId, createdAt: { gte: startOfMonth } },
+      where: { ...scope, createdAt: { gte: startOfMonth } },
       _sum: { costUsd: true },
     }),
     prisma.requestLog.count({
-      where: { userId, createdAt: { gte: startOfDay } },
+      where: { ...scope, createdAt: { gte: startOfDay } },
     }),
     prisma.requestLog.count({
-      where: { userId, createdAt: { gte: rangeStart } },
+      where: { ...scope, createdAt: { gte: rangeStart } },
     }),
     prisma.requestLog.count({
-      where: { userId, status: 'failed', createdAt: { gte: rangeStart } },
+      where: { ...scope, status: 'failed', createdAt: { gte: rangeStart } },
     }),
     // Daily chart aggregation in SQL instead of loading all rows
     prisma.$queryRaw<Array<{
@@ -62,44 +70,44 @@ export async function GET(req: Request) {
         COALESCE(SUM("completionTokens"), 0)::bigint as completion_tokens,
         COALESCE(AVG(NULLIF("latencyMs", 0)), 0) as avg_latency
       FROM "RequestLog"
-      WHERE "userId" = ${userId} AND "createdAt" >= ${rangeStart}
+      WHERE ${sqlScope} AND "createdAt" >= ${rangeStart}
       GROUP BY TO_CHAR("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')
       ORDER BY date ASC
     `,
     prisma.requestLog.groupBy({
       by: ['provider'],
-      where: { userId, createdAt: { gte: rangeStart } },
+      where: { ...scope, createdAt: { gte: rangeStart } },
       _sum: { costUsd: true },
       _count: true,
     }),
     prisma.requestLog.groupBy({
       by: ['platformKeyId'],
-      where: { userId, createdAt: { gte: rangeStart } },
+      where: { ...scope, createdAt: { gte: rangeStart } },
       _sum: { costUsd: true, totalTokens: true },
       _count: true,
     }),
     prisma.requestLog.groupBy({
       by: ['provider', 'model'],
-      where: { userId, createdAt: { gte: rangeStart } },
+      where: { ...scope, createdAt: { gte: rangeStart } },
       _sum: { costUsd: true, totalTokens: true },
       _avg: { latencyMs: true },
       _count: true,
     }),
     prisma.requestLog.groupBy({
       by: ['provider', 'model'],
-      where: { userId, status: 'failed', createdAt: { gte: rangeStart } },
+      where: { ...scope, status: 'failed', createdAt: { gte: rangeStart } },
       _count: true,
     }),
     prisma.requestLog.aggregate({
-      where: { userId, createdAt: { gte: rangeStart } },
+      where: { ...scope, createdAt: { gte: rangeStart } },
       _avg: { latencyMs: true },
     }),
     prisma.requestLog.aggregate({
-      where: { userId, createdAt: { gte: rangeStart } },
+      where: { ...scope, createdAt: { gte: rangeStart } },
       _sum: { totalTokens: true, promptTokens: true, completionTokens: true },
     }),
     prisma.requestLog.findMany({
-      where: { userId },
+      where: { ...scope },
       select: {
         id: true,
         provider: true,
@@ -128,7 +136,7 @@ export async function GET(req: Request) {
         COALESCE(PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY "latencyMs"), 0) as p99,
         COUNT(*)::bigint as cnt
       FROM "RequestLog"
-      WHERE "userId" = ${userId}
+      WHERE ${sqlScope}
         AND "createdAt" >= ${rangeStart}
         AND "latencyMs" > 0
     `,
@@ -138,7 +146,7 @@ export async function GET(req: Request) {
         TO_CHAR("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') as date,
         COALESCE(SUM("costUsd"), 0) as cost
       FROM "RequestLog"
-      WHERE "userId" = ${userId} AND "createdAt" >= ${startOfMonth}
+      WHERE ${sqlScope} AND "createdAt" >= ${startOfMonth}
       GROUP BY TO_CHAR("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')
       ORDER BY date ASC
     `,

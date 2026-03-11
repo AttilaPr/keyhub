@@ -7,14 +7,15 @@ export async function GET(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const { searchParams } = new URL(req.url)
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '1000', 10) || 1000, 100), 10000)
 
-  const userId = session.user.id
-
   // Fetch the last N requests with token details
   const requests = await prisma.requestLog.findMany({
-    where: { userId, status: 'success' },
+    where: { ...scope, status: 'success' },
     select: {
       provider: true,
       model: true,

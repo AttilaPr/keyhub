@@ -4,12 +4,12 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createMistral } from '@ai-sdk/mistral'
 
 export const PROVIDERS = {
-  openai: (key: string) => createOpenAI({ apiKey: key, compatibility: 'compatible' }),
+  openai: (key: string) => createOpenAI({ apiKey: key }),
   anthropic: (key: string) => createAnthropic({ apiKey: key }),
   google: (key: string) => createGoogleGenerativeAI({ apiKey: key }),
   mistral: (key: string) => createMistral({ apiKey: key }),
   keyhub: (key: string) =>
-    createOpenAI({ apiKey: key, baseURL: 'https://openrouter.ai/api/v1', compatibility: 'compatible' }),
+    createOpenAI({ apiKey: key, baseURL: 'https://openrouter.ai/api/v1' }),
 } as const
 
 export type ProviderName = keyof typeof PROVIDERS

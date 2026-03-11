@@ -9,8 +9,11 @@ export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const keys = await prisma.platformKey.findMany({
-    where: { userId: session.user.id },
+    where: { ...scope },
     select: {
       id: true,
       label: true,
@@ -84,6 +87,8 @@ export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+
   // Check plan limit before creating
   const planCheck = await checkPlanLimit(session.user.id, 'platformKeys')
   if (!planCheck.allowed) {
@@ -133,6 +138,7 @@ export async function POST(req: Request) {
       budgetUsd: keyBudget ? parseFloat(keyBudget) || null : null,
       budgetPeriod: keyBudgetPeriod && ['daily', 'weekly', 'monthly'].includes(keyBudgetPeriod) ? keyBudgetPeriod : 'monthly',
       ipAllowlist: Array.isArray(keyIpAllowlist) ? keyIpAllowlist : [],
+      orgId: orgId || undefined,
     },
   })
 
@@ -149,12 +155,15 @@ export async function DELETE(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
   await prisma.platformKey.deleteMany({
-    where: { id, userId: session.user.id },
+    where: { id, ...scope },
   })
 
   return NextResponse.json({ success: true })
@@ -163,6 +172,9 @@ export async function DELETE(req: Request) {
 export async function PATCH(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
 
   const { id, isActive, rateLimit, label, expiresAt, allowedProviders, allowedModels, maxCostPerRequest, budgetUsd, budgetPeriod, ipAllowlist, maxRetries, routingStrategy, fallbackRules } = await req.json()
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
@@ -210,7 +222,7 @@ export async function PATCH(req: Request) {
   }
 
   await prisma.platformKey.updateMany({
-    where: { id, userId: session.user.id },
+    where: { id, ...scope },
     data,
   })
 
@@ -218,7 +230,7 @@ export async function PATCH(req: Request) {
   if (Array.isArray(fallbackRules)) {
     // Verify ownership first
     const key = await prisma.platformKey.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, ...scope },
       select: { id: true },
     })
     if (key) {

@@ -13,6 +13,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const start = Date.now()
   const { model, messages, platformKeyId, temperature, maxTokens } = await req.json()
 
@@ -38,7 +41,7 @@ export async function POST(req: Request) {
   let platformKey: { id: string } | null = null
   if (platformKeyId) {
     platformKey = await prisma.platformKey.findFirst({
-      where: { id: platformKeyId, userId: session.user.id, isActive: true },
+      where: { id: platformKeyId, ...scope, isActive: true },
     })
   }
 
@@ -59,7 +62,7 @@ export async function POST(req: Request) {
     actualModelId = freeConfig.actualModel
   } else {
     const pk = await prisma.providerKey.findFirst({
-      where: { userId: session.user.id, provider, isActive: true },
+      where: { ...scope, provider, isActive: true },
     })
 
     if (!pk) {
@@ -87,6 +90,7 @@ export async function POST(req: Request) {
         await prisma.requestLog.create({
           data: {
             userId: session.user.id,
+            orgId: orgId || undefined,
             platformKeyId: platformKey.id,
             providerKeyId: providerKey?.id ?? null,
             provider,

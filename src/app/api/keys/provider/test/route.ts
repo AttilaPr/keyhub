@@ -31,13 +31,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const { id } = await req.json()
   if (!id) {
     return NextResponse.json({ error: 'Missing key id' }, { status: 400 })
   }
 
   const providerKey = await prisma.providerKey.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, ...scope },
   })
 
   if (!providerKey) {

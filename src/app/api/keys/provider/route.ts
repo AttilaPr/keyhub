@@ -8,12 +8,15 @@ export async function GET(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const { searchParams } = new URL(req.url)
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50))
   const skip = (page - 1) * limit
 
-  const where = { userId: session.user.id }
+  const where = { ...scope }
 
   const [keys, total] = await Promise.all([
     prisma.providerKey.findMany({
@@ -70,6 +73,8 @@ export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+
   let body
   try {
     body = await req.json()
@@ -115,6 +120,7 @@ export async function POST(req: Request) {
       encryptedKey: encryptKey(apiKey),
       lastRotatedAt: new Date(),
       weight: parsedWeight,
+      orgId: orgId || undefined,
     },
   })
 
@@ -125,12 +131,15 @@ export async function DELETE(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
   await prisma.providerKey.deleteMany({
-    where: { id, userId: session.user.id },
+    where: { id, ...scope },
   })
 
   return NextResponse.json({ success: true })
@@ -139,6 +148,9 @@ export async function DELETE(req: Request) {
 export async function PATCH(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
 
   let patchBody
   try {
@@ -167,7 +179,7 @@ export async function PATCH(req: Request) {
   }
 
   await prisma.providerKey.updateMany({
-    where: { id, userId: session.user.id },
+    where: { id, ...scope },
     data,
   })
 

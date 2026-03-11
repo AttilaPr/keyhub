@@ -343,9 +343,12 @@ export async function POST(req: Request) {
     // Map keyhub/free → openrouter/free for the actual API call
     actualModelId = freeConfig.actualModel
   } else {
-    // Fetch ALL active provider keys for load balancing
+    // Fetch ALL active provider keys for load balancing (org-scoped)
+    const providerKeyScope = platformKey.orgId
+      ? { orgId: platformKey.orgId, provider, isActive: true }
+      : { userId: platformKey.userId, orgId: null, provider, isActive: true }
     const providerKeys = await prisma.providerKey.findMany({
-      where: { userId: platformKey.userId, provider, isActive: true },
+      where: providerKeyScope,
     })
 
     if (providerKeys.length === 0) {
@@ -392,6 +395,7 @@ export async function POST(req: Request) {
             data: {
               requestId,
               userId: platformKey.userId,
+              orgId: platformKey.orgId ?? undefined,
               platformKeyId: platformKey.id,
               providerKeyId: providerKey?.id ?? null,
               provider,
@@ -464,9 +468,12 @@ export async function POST(req: Request) {
       const fbProvider = rule.fallbackProvider
       if (!(fbProvider in PROVIDERS)) continue
 
-      // Find an active provider key for the fallback provider
+      // Find an active provider key for the fallback provider (org-scoped)
+      const fbProviderKeyScope = platformKey.orgId
+        ? { orgId: platformKey.orgId, provider: fbProvider, isActive: true }
+        : { userId: platformKey.userId, orgId: null, provider: fbProvider, isActive: true }
       const fbProviderKey = await prisma.providerKey.findFirst({
-        where: { userId: platformKey.userId, provider: fbProvider, isActive: true },
+        where: fbProviderKeyScope,
       })
       if (!fbProviderKey) continue
 
@@ -492,6 +499,7 @@ export async function POST(req: Request) {
                 data: {
                   requestId,
                   userId: platformKey.userId,
+                  orgId: platformKey.orgId ?? undefined,
                   platformKeyId: platformKey.id,
                   providerKeyId: fbProviderKey.id,
                   provider: fbProvider,
@@ -544,6 +552,7 @@ export async function POST(req: Request) {
       data: {
         requestId,
         userId: platformKey.userId,
+        orgId: platformKey.orgId ?? undefined,
         platformKeyId: platformKey.id,
         providerKeyId: providerKey?.id ?? null,
         provider,

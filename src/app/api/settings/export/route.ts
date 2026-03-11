@@ -9,6 +9,8 @@ export async function POST() {
   }
 
   const userId = session.user.id
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId, orgId: null }
 
   // Fetch user profile (excluding password hash)
   const user = await prisma.user.findUnique({
@@ -43,7 +45,7 @@ export async function POST() {
 
   // Fetch provider keys metadata (no secrets)
   const providerKeys = await prisma.providerKey.findMany({
-    where: { userId },
+    where: { ...scope },
     select: {
       id: true,
       provider: true,
@@ -57,7 +59,7 @@ export async function POST() {
 
   // Fetch platform keys metadata (no secrets)
   const platformKeys = await prisma.platformKey.findMany({
-    where: { userId },
+    where: { ...scope },
     select: {
       id: true,
       label: true,
@@ -79,13 +81,13 @@ export async function POST() {
   // Fetch logs summary (aggregated, not full prompts/responses for size)
   const logsSummary = await prisma.requestLog.groupBy({
     by: ['provider', 'model', 'status'],
-    where: { userId },
+    where: { ...scope },
     _count: { id: true },
     _sum: { costUsd: true, totalTokens: true },
     _avg: { latencyMs: true },
   })
 
-  const totalLogs = await prisma.requestLog.count({ where: { userId } })
+  const totalLogs = await prisma.requestLog.count({ where: { ...scope } })
 
   // Fetch organization memberships
   const orgMemberships = await prisma.organizationMember.findMany({
@@ -99,7 +101,7 @@ export async function POST() {
     },
   })
 
-  // Fetch webhook endpoints (no secrets)
+  // Fetch webhook endpoints (no secrets) — user-scoped (no orgId on model)
   const webhookEndpoints = await prisma.webhookEndpoint.findMany({
     where: { userId },
     select: {
@@ -112,7 +114,7 @@ export async function POST() {
     },
   })
 
-  // Fetch prompt templates
+  // Fetch prompt templates — user-scoped (no orgId on model)
   const promptTemplates = await prisma.promptTemplate.findMany({
     where: { userId },
     select: {

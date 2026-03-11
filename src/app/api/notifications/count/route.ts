@@ -8,9 +8,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const count = await prisma.anomalyEvent.count({
     where: {
-      userId: session.user.id,
+      ...scope,
       acknowledgedAt: null,
     },
   })

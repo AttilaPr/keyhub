@@ -7,12 +7,15 @@ export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+
   // Run detection
   await detectAnomalies(session.user.id)
 
-  // Return recent events
+  // Return recent events (org-scoped)
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
   const events = await prisma.anomalyEvent.findMany({
-    where: { userId: session.user.id },
+    where: { ...scope },
     orderBy: { detectedAt: 'desc' },
     take: 20,
   })
@@ -24,11 +27,14 @@ export async function PATCH(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const orgId = (session as any).activeOrgId ?? null
+  const scope = orgId ? { orgId } : { userId: session.user.id, orgId: null }
+
   const { id } = await req.json()
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
   await prisma.anomalyEvent.updateMany({
-    where: { id, userId: session.user.id },
+    where: { id, ...scope },
     data: { acknowledgedAt: new Date() },
   })
 

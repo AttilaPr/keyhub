@@ -1,23 +1,30 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
-import { resolveUserId } from '@/lib/api-auth'
+import { resolveContext, scopeWhere } from '@/lib/api-auth'
 
 export async function GET(req: Request) {
-  const userId = await resolveUserId(req)
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = await resolveContext(req)
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const userId = ctx.userId
+  const scope = scopeWhere(ctx)
+  const sqlScope = ctx.orgId
+    ? Prisma.sql`"orgId" = ${ctx.orgId}`
+    : Prisma.sql`"userId" = ${userId} AND "orgId" IS NULL`
 
   const { searchParams } = new URL(req.url)
   const days = Math.min(Math.max(parseInt(searchParams.get('days') || '30', 10) || 30, 1), 365)
   const tagFilter = searchParams.get('tag')
   const rangeStart = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
-  const where: any = { userId, createdAt: { gte: rangeStart } }
+  const where: any = { ...scope, createdAt: { gte: rangeStart } }
   if (tagFilter) where.tag = tagFilter
 
   // Fetch tag breakdown
   const tagBreakdown = await prisma.requestLog.groupBy({
     by: ['tag'],
-    where: { userId, createdAt: { gte: rangeStart }, tag: { not: null } },
+    where: { ...scope, createdAt: { gte: rangeStart }, tag: { not: null } },
     _sum: { costUsd: true },
     _avg: { latencyMs: true },
     _count: true,
@@ -25,7 +32,7 @@ export async function GET(req: Request) {
 
   // Get all distinct tags for filter dropdown
   const distinctTags = await prisma.requestLog.findMany({
-    where: { userId, tag: { not: null } },
+    where: { ...scope, tag: { not: null } },
     select: { tag: true },
     distinct: ['tag'],
     orderBy: { tag: 'asc' },

@@ -24,13 +24,10 @@ export async function GET(req: Request) {
   ])
 
   // Compute usage count per template: count RequestLog entries whose tag matches the template id
-  // Templates are referenced via X-KeyHub-Template header, stored as tag in some setups,
-  // or we approximate by counting logs whose prompt starts with the template systemPrompt
   const templateIds = templates.map((t) => t.id)
   const usageCounts: Map<string, number> = new Map()
 
   if (templateIds.length > 0) {
-    // Count logs that have a tag matching the template ID (set via X-KeyHub-Template header)
     const tagCounts = await prisma.requestLog.groupBy({
       by: ['tag'],
       where: {
