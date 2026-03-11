@@ -12,10 +12,8 @@ import { Slider } from '@/components/ui/slider'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { useToast } from '@/components/ui/toast'
-import { Square, Save } from 'lucide-react'
-import { SendIcon } from '@/components/ui/send'
+import { Save, ExternalLink } from 'lucide-react'
 import { DeleteIcon } from '@/components/ui/delete'
-import { LoaderPinwheelIcon } from '@/components/ui/loader-pinwheel'
 import { ChevronDownIcon } from '@/components/ui/chevron-down'
 import { ChevronUpIcon } from '@/components/ui/chevron-up'
 import { DownloadIcon } from '@/components/ui/download'
@@ -23,7 +21,22 @@ import { FileTextIcon } from '@/components/ui/file-text'
 import { FolderOpenIcon } from '@/components/ui/folder-open'
 import { apiFetch } from '@/lib/fetch'
 
-interface Message {
+// AI Elements
+import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTools,
+  PromptInputSelect,
+  PromptInputSelectTrigger,
+  PromptInputSelectContent,
+  PromptInputSelectItem,
+  PromptInputSelectValue,
+} from '@/components/ai-elements/prompt-input'
+
+interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
 }
@@ -31,7 +44,7 @@ interface Message {
 interface SavedSession {
   id: string
   name: string
-  messages: Message[]
+  messages: ChatMessage[]
   model: string
   systemPrompt: string
   temperature: number
@@ -82,7 +95,7 @@ function persistSessions(sessions: SavedSession[]) {
 }
 
 export default function PlaygroundPage() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [model, setModel] = useState('keyhub/free')
   const [systemPrompt, setSystemPrompt] = useState('')
@@ -112,6 +125,13 @@ export default function PlaygroundPage() {
   const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false)
   const [sessionName, setSessionName] = useState('')
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null)
+
+  // Flat list of all model IDs for the prompt input selector
+  const flatModels = allModels.flatMap((group) => {
+    const isFree = group.key === 'keyhub'
+    const isActive = isFree || activeProviders.has(group.key)
+    return group.models.map((m) => ({ id: m, disabled: !isActive, isFree }))
+  })
 
   useEffect(() => {
     const saved = localStorage.getItem('keyhub-playground-system-prompt')
@@ -171,8 +191,9 @@ export default function PlaygroundPage() {
     localStorage.setItem('keyhub-playground-system-prompt', systemPrompt)
   }, [systemPrompt])
 
-  async function handleSend() {
-    if (!input.trim() || streaming) return
+  async function handleSend(text?: string) {
+    const msg = text ?? input
+    if (!msg.trim() || streaming) return
 
     const isFree = model === 'keyhub/free'
     if (!isFree && !selectedKeyId) {
@@ -180,7 +201,7 @@ export default function PlaygroundPage() {
       return
     }
 
-    const userMessage: Message = { role: 'user', content: input.trim() }
+    const userMessage: ChatMessage = { role: 'user', content: msg.trim() }
     const newMessages = [...messages, userMessage]
     setMessages(newMessages)
     setInput('')
@@ -269,13 +290,6 @@ export default function PlaygroundPage() {
     setExpandedRaw(null)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
   // Session management
   function handleSaveSession() {
     if (!sessionName.trim()) return
@@ -347,6 +361,8 @@ export default function PlaygroundPage() {
     addToast({ title: 'Exported', description: 'Conversation exported as Markdown.', variant: 'success' })
   }
 
+  const chatStatus = streaming ? 'streaming' as const : 'ready' as const
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -377,30 +393,11 @@ export default function PlaygroundPage() {
 
       {/* Config bar */}
       <div className="flex flex-wrap gap-3 items-end">
-        <div className="w-64">
-          <Label className="text-xs text-muted-foreground mb-1">Model</Label>
-          <Select value={model} onValueChange={(v) => v && setModel(v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {allModels.map((group) => {
-                const isFree = group.key === 'keyhub'
-                const isActive = isFree || activeProviders.has(group.key)
-                return group.models.map((m) => (
-                  <SelectItem key={m} value={m} disabled={!isActive}>
-                    {m}{isFree ? ' (free)' : !isActive ? ' (no key)' : ''}
-                  </SelectItem>
-                ))
-              })}
-            </SelectContent>
-          </Select>
-        </div>
         <div className="w-48">
           <Label className="text-xs text-muted-foreground mb-1">API Key</Label>
           <Select value={selectedKeyId} onValueChange={(v) => v && setSelectedKeyId(v)}>
             <SelectTrigger>
-              <SelectValue placeholder="Select key..." />
+              <SelectValue placeholder={model === 'keyhub/free' ? 'Not needed (free)' : 'Select key...'} />
             </SelectTrigger>
             <SelectContent>
               {platformKeys.map((k) => (
@@ -507,69 +504,65 @@ export default function PlaygroundPage() {
         </div>
       )}
 
-      {/* Chat area */}
+      {/* Chat area with AI Elements */}
       <Card className="min-h-[400px] flex flex-col">
-        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[500px]">
+        <CardContent className="flex-1 overflow-y-auto p-6 space-y-6 max-h-[500px]">
           {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              Send a message to start chatting
+            <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground text-sm">
+              <p>Send a message to start chatting</p>
+              <p className="text-xs">Using <code className="text-lime-400">{model}</code></p>
             </div>
           ) : (
             messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2.5 text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-primary/10 text-lime-100'
-                      : 'bg-card text-muted-foreground'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge className={`text-[10px] ${
-                      msg.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-zinc-700 text-muted-foreground'
-                    }`}>
-                      {msg.role}
-                    </Badge>
-                  </div>
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                </div>
-              </div>
+              <Message key={i} from={msg.role}>
+                <MessageContent>
+                  {msg.role === 'assistant' ? (
+                    <MessageResponse>{msg.content}</MessageResponse>
+                  ) : (
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  )}
+                </MessageContent>
+              </Message>
             ))
-          )}
-          {streaming && messages[messages.length - 1]?.content === '' && (
-            <div className="flex justify-start">
-              <div className="bg-card rounded-lg px-4 py-2.5">
-                <LoaderPinwheelIcon size={16} className="animate-spin text-muted-foreground" />
-              </div>
-            </div>
           )}
           <div ref={messagesEndRef} />
         </CardContent>
 
-        {/* Input */}
+        {/* AI Elements Prompt Input */}
         <div className="border-t border-border p-4">
-          <div className="flex gap-2">
-            <Input
+          <PromptInput
+            onSubmit={({ text }) => {
+              handleSend(text)
+            }}
+          >
+            <PromptInputTextarea
+              placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
+              disabled={streaming}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message... (Ctrl+Enter to send)"
-              disabled={streaming}
-              className="flex-1"
             />
-            {streaming ? (
-              <Button variant="destructive" size="icon" onClick={handleStop}>
-                <Square className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button onClick={handleSend} disabled={!input.trim() || (model !== 'keyhub/free' && !selectedKeyId)}>
-                <SendIcon size={16} />
-              </Button>
-            )}
-          </div>
+            <PromptInputFooter>
+              <PromptInputTools>
+                <PromptInputSelect value={model} onValueChange={(v) => v && setModel(v)}>
+                  <PromptInputSelectTrigger className="w-auto max-w-[200px]">
+                    <PromptInputSelectValue />
+                  </PromptInputSelectTrigger>
+                  <PromptInputSelectContent>
+                    {flatModels.map((m) => (
+                      <PromptInputSelectItem key={m.id} value={m.id} disabled={m.disabled}>
+                        {m.id}{m.isFree ? ' (free)' : m.disabled ? ' (no key)' : ''}
+                      </PromptInputSelectItem>
+                    ))}
+                  </PromptInputSelectContent>
+                </PromptInputSelect>
+              </PromptInputTools>
+              <PromptInputSubmit
+                status={chatStatus}
+                onStop={handleStop}
+                disabled={!input.trim() || (model !== 'keyhub/free' && !selectedKeyId)}
+              />
+            </PromptInputFooter>
+          </PromptInput>
         </div>
       </Card>
 
@@ -608,6 +601,22 @@ export default function PlaygroundPage() {
           ))}
         </div>
       )}
+
+      {/* AI Elements Banner */}
+      <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
+        <span>KeyHub API is compatible with</span>
+        <a
+          href="https://vercel.com/changelog/introducing-ai-elements"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+        >
+          Vercel AI Elements
+          <ExternalLink className="h-3 w-3" />
+        </a>
+        <span>—</span>
+        <code className="rounded bg-background px-1.5 py-0.5 font-mono text-primary">npx ai-elements@latest</code>
+      </div>
 
       {/* Save Session Dialog */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
