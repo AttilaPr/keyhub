@@ -16,17 +16,8 @@ export async function POST(req: Request) {
   const start = Date.now()
   const { model, messages, platformKeyId, temperature, maxTokens } = await req.json()
 
-  if (!model || !messages || !platformKeyId) {
+  if (!model || !messages) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-  }
-
-  // Verify platform key belongs to user
-  const platformKey = await prisma.platformKey.findFirst({
-    where: { id: platformKeyId, userId: session.user.id, isActive: true },
-  })
-
-  if (!platformKey) {
-    return NextResponse.json({ error: 'Platform key not found or inactive' }, { status: 400 })
   }
 
   let provider: string, modelId: string
@@ -42,6 +33,18 @@ export async function POST(req: Request) {
 
   const fullModelName = `${provider}/${modelId}`
   const isFreeModel = isPlatformFreeModel(fullModelName)
+
+  // Platform key is optional for free models
+  let platformKey: { id: string } | null = null
+  if (platformKeyId) {
+    platformKey = await prisma.platformKey.findFirst({
+      where: { id: platformKeyId, userId: session.user.id, isActive: true },
+    })
+  }
+
+  if (!isFreeModel && !platformKey) {
+    return NextResponse.json({ error: 'Platform key not found or inactive' }, { status: 400 })
+  }
 
   let providerKey: { id: string } | null = null
   let apiKey: string
@@ -77,6 +80,9 @@ export async function POST(req: Request) {
         const promptTokens = (usage as any)?.promptTokens ?? (usage as any)?.inputTokens ?? 0
         const completionTokens = (usage as any)?.completionTokens ?? (usage as any)?.outputTokens ?? 0
         const costUsd = isFreeModel ? 0 : calculateCost(modelId, promptTokens, completionTokens)
+
+        // Skip logging for free model playground requests without a platform key
+        if (!platformKey) return
 
         await prisma.requestLog.create({
           data: {

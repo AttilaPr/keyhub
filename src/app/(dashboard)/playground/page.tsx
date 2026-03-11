@@ -174,7 +174,8 @@ export default function PlaygroundPage() {
   async function handleSend() {
     if (!input.trim() || streaming) return
 
-    if (!selectedKeyId) {
+    const isFree = model === 'openrouter/free'
+    if (!isFree && !selectedKeyId) {
       addToast({ title: 'No key selected', description: 'Select a platform key to use', variant: 'destructive' })
       return
     }
@@ -564,7 +565,7 @@ export default function PlaygroundPage() {
                 <Square className="h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={handleSend} disabled={!input.trim() || !selectedKeyId}>
+              <Button onClick={handleSend} disabled={!input.trim() || (model !== 'openrouter/free' && !selectedKeyId)}>
                 <SendIcon size={16} />
               </Button>
             )}
