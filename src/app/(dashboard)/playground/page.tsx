@@ -19,6 +19,7 @@ import { ChevronUpIcon } from '@/components/ui/chevron-up'
 import { DownloadIcon } from '@/components/ui/download'
 import { FileTextIcon } from '@/components/ui/file-text'
 import { FolderOpenIcon } from '@/components/ui/folder-open'
+import { Spinner } from '@/components/ui/spinner'
 import { apiFetch } from '@/lib/fetch'
 
 // AI Elements
@@ -126,11 +127,12 @@ export default function PlaygroundPage() {
   const [sessionName, setSessionName] = useState('')
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null)
 
-  // Flat list of all model IDs for the prompt input selector
+  // Flat list of model IDs — only show providers the user has keys for
   const flatModels = allModels.flatMap((group) => {
     const isFree = group.key === 'keyhub'
     const isActive = isFree || activeProviders.has(group.key)
-    return group.models.map((m) => ({ id: m, disabled: !isActive, isFree }))
+    if (!isActive) return []
+    return group.models.map((m) => ({ id: m, disabled: false, isFree }))
   })
 
   useEffect(() => {
@@ -155,7 +157,8 @@ export default function PlaygroundPage() {
         ])
 
         if (providerRes.ok) {
-          const keys: { provider: string; isActive: boolean }[] = await providerRes.json()
+          const data = await providerRes.json()
+          const keys: { provider: string; isActive: boolean }[] = data.keys ?? data
           setActiveProviders(new Set(keys.filter((k) => k.isActive).map((k) => k.provider)))
         }
 
@@ -171,8 +174,8 @@ export default function PlaygroundPage() {
         }
 
         if (templatesRes.ok) {
-          const data: PromptTemplate[] = await templatesRes.json()
-          setTemplates(data)
+          const data = await templatesRes.json()
+          setTemplates(data.templates ?? data)
         }
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return
@@ -250,10 +253,28 @@ export default function PlaygroundPage() {
       let assistantContent = ''
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
+      let streamError: string | null = null
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         assistantContent += decoder.decode(value, { stream: true })
+
+        // Detect streamed error JSON (e.g. provider insufficient_quota errors)
+        const trimmed = assistantContent.trimStart()
+        if (trimmed.startsWith('{') || trimmed.startsWith('event:')) {
+          try {
+            // Try parsing as direct JSON error
+            const parsed = JSON.parse(trimmed)
+            if (parsed?.type === 'error' || parsed?.error) {
+              streamError = parsed?.error?.message || parsed?.message || parsed?.error || 'An error occurred'
+              break
+            }
+          } catch {
+            // Not valid JSON yet — could still be streaming text, continue
+          }
+        }
+
         setMessages((prev) => {
           const updated = [...prev]
           updated[updated.length - 1] = { role: 'assistant', content: assistantContent }
@@ -261,15 +282,43 @@ export default function PlaygroundPage() {
         })
       }
 
-      // Store raw exchange for the raw view
-      if (showRaw) {
-        setRawExchanges((prev) => [...prev, {
-          request: requestBody,
-          response: assistantContent,
-        }])
+      // Post-loop: also check if the final content is an error JSON that wasn't caught mid-stream
+      if (!streamError && assistantContent.trim()) {
+        try {
+          const parsed = JSON.parse(assistantContent.trim())
+          if (parsed?.type === 'error' || parsed?.error) {
+            streamError = parsed?.error?.message || parsed?.message || parsed?.error || 'An error occurred'
+          }
+        } catch {
+          // Not JSON — normal response text
+        }
+      }
+
+      if (streamError) {
+        // Remove the empty/partial assistant message
+        setMessages((prev) => prev.slice(0, -1))
+        addToast({ title: 'Provider Error', description: streamError, variant: 'destructive' })
+      } else if (!assistantContent.trim()) {
+        // Empty response — remove the blank assistant message
+        setMessages((prev) => prev.slice(0, -1))
+        addToast({ title: 'Error', description: 'No response received from the model', variant: 'destructive' })
+      } else {
+        // Store raw exchange for the raw view
+        if (showRaw) {
+          setRawExchanges((prev) => [...prev, {
+            request: requestBody,
+            response: assistantContent,
+          }])
+        }
       }
     } catch (err: unknown) {
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        // Remove partial assistant message on error
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          if (last?.role === 'assistant' && !last.content) return prev.slice(0, -1)
+          return prev
+        })
         addToast({ title: 'Error', description: err instanceof Error ? err.message : 'Failed to send message', variant: 'destructive' })
       }
     } finally {
@@ -517,7 +566,14 @@ export default function PlaygroundPage() {
               <Message key={i} from={msg.role}>
                 <MessageContent>
                   {msg.role === 'assistant' ? (
-                    <MessageResponse>{msg.content}</MessageResponse>
+                    msg.content ? (
+                      <MessageResponse>{msg.content}</MessageResponse>
+                    ) : (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Spinner className="size-4 text-lime-400" />
+                        <span className="text-sm">Thinking...</span>
+                      </div>
+                    )
                   ) : (
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   )}

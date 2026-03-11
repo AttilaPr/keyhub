@@ -60,10 +60,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             className={cn(
               'flex items-start gap-3 rounded-lg border p-4 shadow-lg animate-in slide-in-from-right-full min-w-[320px] max-w-[420px]',
               toast.variant === 'destructive'
-                ? 'border-red-800 bg-red-950 text-red-100'
+                ? 'border-destructive/50 bg-destructive/10 text-destructive'
                 : toast.variant === 'success'
-                ? 'border-lime-800 bg-lime-950 text-lime-100'
-                : 'border-zinc-800 bg-zinc-950 text-zinc-100'
+                ? 'border-lime-400/30 bg-lime-400/10 text-lime-700 dark:text-lime-300'
+                : 'border-border bg-background text-foreground'
             )}
           >
             <div className="flex-1">
@@ -74,7 +74,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-zinc-400 hover:text-zinc-100 cursor-pointer"
+              className="text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>

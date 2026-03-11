@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 import { BadgeAlertIcon } from '@/components/ui/badge-alert'
 import { RefreshCWIcon } from '@/components/ui/refresh-cw'
@@ -93,7 +94,8 @@ export default function DashboardPage() {
     return WIDGET_REGISTRY.find(w => w.id === id)
   }
 
-  if (loading) {
+  // Initial load — no data yet
+  if (loading && !data) {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-between">
@@ -115,15 +117,9 @@ export default function DashboardPage() {
             </Select>
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          {[...Array(5)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="pt-6">
-                <Skeleton className="h-4 w-24 mb-3" />
-                <Skeleton className="h-8 w-32" />
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <Spinner className="size-6 text-lime-400" />
+          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -171,7 +167,16 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="relative space-y-8">
+      {/* Refetch loading overlay */}
+      {loading && (
+        <div className="absolute inset-0 z-10 flex items-start justify-center bg-background/50 pt-32">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 shadow-sm">
+            <Spinner className="size-4 text-lime-400" />
+            <span className="text-sm text-muted-foreground">Refreshing...</span>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -217,7 +222,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground mb-3">
                   Use <code className="text-lime-400">keyhub/free</code> in the Playground — no API keys or setup needed. Zero cost, 200K context, supports images and tool calling.
                 </p>
-                <Button size="sm" variant="outline" className="border-lime-400/30 text-lime-400 hover:bg-lime-400/10" render={<Link href="/playground" />}>
+                <Button size="sm" variant="outline" nativeButton={false} className="border-lime-400/30 text-lime-400 hover:bg-lime-400/10" render={<Link href="/playground" />}>
                   Open Playground
                 </Button>
               </div>
@@ -229,7 +234,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground mb-3">
                   Connect your OpenAI, Anthropic, Google, or Mistral API keys to unlock all premium models.
                 </p>
-                <Button size="sm" variant="outline" render={<Link href="/provider-keys" />}>
+                <Button size="sm" variant="outline" nativeButton={false} render={<Link href="/provider-keys" />}>
                   Provider Keys
                 </Button>
               </div>
@@ -241,7 +246,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground mb-3">
                   Generate API keys for your apps. Use <code className="text-primary">provider/model</code> format (e.g. <code className="text-primary">openai/gpt-4o</code>).
                 </p>
-                <Button size="sm" variant="outline" render={<Link href="/platform-keys" />}>
+                <Button size="sm" variant="outline" nativeButton={false} render={<Link href="/platform-keys" />}>
                   Platform Keys
                 </Button>
               </div>

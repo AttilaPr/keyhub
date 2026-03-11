@@ -15,7 +15,7 @@ export function CTASection() {
             through a single API gateway.
           </p>
           <div className="mt-8">
-            <Button size="lg" render={<Link href="/register" />}>
+            <Button size="lg" nativeButton={false} render={<Link href="/register" />}>
               Create Free Account
             </Button>
           </div>

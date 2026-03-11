@@ -109,7 +109,9 @@ export async function POST(req: Request) {
       },
     }
 
-    if (typeof temperature === 'number' && temperature >= 0 && temperature <= 2) {
+    // Reasoning models (o1, o3, o4, etc.) don't support temperature
+    const isReasoningModel = /^o\d/.test(actualModelId)
+    if (!isReasoningModel && typeof temperature === 'number' && temperature >= 0 && temperature <= 2) {
       streamOpts.temperature = temperature
     }
     if (typeof maxTokens === 'number' && maxTokens > 0) {

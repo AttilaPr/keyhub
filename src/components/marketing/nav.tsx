@@ -21,15 +21,15 @@ export function MarketingNav() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {session ? (
-            <Button render={<Link href="/dashboard" />}>
+            <Button nativeButton={false} render={<Link href="/dashboard" />}>
               Dashboard
             </Button>
           ) : (
             <>
-              <Button variant="ghost" render={<Link href="/login" />}>
+              <Button variant="ghost" nativeButton={false} render={<Link href="/login" />}>
                 Log in
               </Button>
-              <Button render={<Link href="/register" />}>
+              <Button nativeButton={false} render={<Link href="/register" />}>
                 Sign Up
               </Button>
             </>

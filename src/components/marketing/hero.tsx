@@ -127,10 +127,10 @@ export function HeroSection() {
           Free AI models included — start building with zero cost
         </div>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-          <Button size="lg" render={<Link href="/register" />}>
+          <Button size="lg" nativeButton={false} render={<Link href="/register" />}>
             Get Started
           </Button>
-          <Button size="lg" variant="outline" render={<Link href="/docs" />}>
+          <Button size="lg" variant="outline" nativeButton={false} render={<Link href="/docs" />}>
             View Documentation
           </Button>
         </div>

@@ -119,7 +119,8 @@ export default function DocsPage() {
         ])
 
         if (providerRes.ok) {
-          const keys: { provider: string; isActive: boolean }[] = await providerRes.json()
+          const data = await providerRes.json()
+          const keys: { provider: string; isActive: boolean }[] = data.keys ?? data
           setActiveProviders(new Set(keys.filter((k) => k.isActive).map((k) => k.provider)))
         }
 
