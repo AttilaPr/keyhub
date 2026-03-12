@@ -195,7 +195,7 @@ export async function detectAnomalies(userId: string): Promise<AnomalyCheck[]> {
           anomaly.actual || 'N/A',
           logsUrl,
         )
-        sendEmail(
+        await sendEmail(
           user.email,
           `[KeyHub] Anomaly Detected: ${anomaly.type}`,
           html,

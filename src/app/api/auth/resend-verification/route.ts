@@ -52,11 +52,15 @@ export async function POST(req: Request) {
 
   const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
   const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${emailVerifyToken}`
-  sendEmail(
-    email,
-    'Verify your email — KeyHub',
-    emailVerificationEmail(user.name || email, verifyUrl),
-  ).catch((err) => console.error('[resend-verification] Failed to send email:', err))
+  try {
+    await sendEmail(
+      email,
+      'Verify your email — KeyHub',
+      emailVerificationEmail(user.name || email, verifyUrl),
+    )
+  } catch (err) {
+    console.error('[resend-verification] Failed to send email:', err)
+  }
 
   return NextResponse.json(successMessage)
 }

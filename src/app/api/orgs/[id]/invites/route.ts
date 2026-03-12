@@ -88,20 +88,22 @@ export async function POST(
     },
   })
 
-  // Send invite email (non-blocking — don't fail the request if email fails)
+  // Send invite email (must await — serverless functions terminate after response)
   const acceptUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/invites/${token}`
-  sendEmail(
-    trimmedEmail,
-    `You're invited to ${org?.name ?? 'an organization'} on KeyHub`,
-    orgInviteEmail(
-      org?.name ?? 'an organization',
-      session.user.name || session.user.email || 'A team member',
-      acceptUrl,
-      expiresAt.toLocaleDateString(),
-    ),
-  ).catch((err) => {
+  try {
+    await sendEmail(
+      trimmedEmail,
+      `You're invited to ${org?.name ?? 'an organization'} on KeyHub`,
+      orgInviteEmail(
+        org?.name ?? 'an organization',
+        session.user.name || session.user.email || 'A team member',
+        acceptUrl,
+        expiresAt.toLocaleDateString(),
+      ),
+    )
+  } catch (err) {
     console.error('[invite] Failed to send invite email:', err)
-  })
+  }
 
   return NextResponse.json({
     id: invite.id,

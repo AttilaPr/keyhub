@@ -154,7 +154,7 @@ export async function POST(req: Request) {
         Date.now() - new Date(budgetUser.lastBudgetAlertSentAt).getTime() > 3600000
       if (cooldownOk) {
         const html = budgetExhaustedEmail(userBudget.used, userBudget.limit!, 'monthly')
-        sendEmail(budgetUser.email, 'Budget Exhausted — KeyHub', html).catch(() => {})
+        await sendEmail(budgetUser.email, 'Budget Exhausted — KeyHub', html).catch(() => {})
         dispatchWebhook(platformKey.userId, 'budget.exhausted', {
           type: 'user',
           used: userBudget.used,

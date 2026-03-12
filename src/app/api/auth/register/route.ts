@@ -70,17 +70,21 @@ export async function POST(req: Request) {
       throw err
     }
 
-    // Send verification email
+    // Send verification email (must await — serverless functions terminate after response)
     const baseUrl = process.env.NEXTAUTH_URL
       || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
       || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
       || 'http://localhost:3000'
     const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${emailVerifyToken}`
-    sendEmail(
-      email,
-      'Verify your email — KeyHub',
-      emailVerificationEmail(safeName || email, verifyUrl),
-    ).catch((err) => console.error('[register] Failed to send verification email:', err))
+    try {
+      await sendEmail(
+        email,
+        'Verify your email — KeyHub',
+        emailVerificationEmail(safeName || email, verifyUrl),
+      )
+    } catch (err) {
+      console.error('[register] Failed to send verification email:', err)
+    }
 
     return NextResponse.json({ message: 'If this email is not registered, a verification email has been sent.' }, { status: 201 })
   } catch (error) {
