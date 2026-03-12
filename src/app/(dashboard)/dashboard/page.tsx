@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -37,6 +38,7 @@ const TIME_RANGES = [
 ]
 
 export default function DashboardPage() {
+  const { activeOrgId } = useOrgs()
   const [data, setData] = useState<DashboardData | null>(null)
   const [budget, setBudget] = useState<BudgetData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -79,7 +81,7 @@ export default function DashboardPage() {
     const controller = new AbortController()
     fetchDashboard(controller.signal)
     return () => controller.abort()
-  }, [days])
+  }, [days, activeOrgId])
 
   // Compute dynamic grid columns for chart row
   const visibleCharts = ['requests-chart', 'daily-cost-chart', 'latency-chart'].filter(id => isVisible(id))

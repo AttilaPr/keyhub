@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { XCircle } from 'lucide-react'
@@ -67,6 +68,7 @@ function formatTimeAgo(dateStr: string): string {
 }
 
 export default function StatusPage() {
+  const { activeOrgId } = useOrgs()
   const [data, setData] = useState<StatusData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -84,7 +86,7 @@ export default function StatusPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeOrgId])
 
   useEffect(() => {
     fetchStatus()

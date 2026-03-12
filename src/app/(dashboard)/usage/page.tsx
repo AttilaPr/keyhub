@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -79,6 +80,7 @@ const TIME_RANGES = [
 ]
 
 export default function UsagePage() {
+  const { activeOrgId } = useOrgs()
   const ct = useChartTheme()
   const { iconRef: errorIconRef, handlers: errorHandlers } = useAnimatedIcon()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -127,7 +129,7 @@ export default function UsagePage() {
     const controller = new AbortController()
     fetchUsage(controller.signal)
     return () => controller.abort()
-  }, [days])
+  }, [days, activeOrgId])
 
   if (loading) {
     return (

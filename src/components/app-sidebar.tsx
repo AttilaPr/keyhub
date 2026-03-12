@@ -112,7 +112,7 @@ const navSecondary = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session, update: updateSession } = useSession()
-  const { orgs } = useOrgs()
+  const { orgs, activeOrgId: ctxOrgId, setActiveOrgId: setCtxOrgId } = useOrgs()
   const [activeOrgId, setActiveOrgId] = React.useState<string>(
     session?.activeOrgId || "personal"
   )
@@ -129,8 +129,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   React.useEffect(() => {
     if (session?.activeOrgId) {
       setActiveOrgId(session.activeOrgId)
+      setCtxOrgId(session.activeOrgId)
     }
-  }, [session?.activeOrgId])
+  }, [session?.activeOrgId, setCtxOrgId])
 
   async function handleOrgSwitch(value: string | null) {
     const orgId = value || "personal"
@@ -144,6 +145,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       if (res.ok) {
         const data = await res.json()
         await updateSession({ activeOrgId: data.activeOrgId || null })
+        // Notify context so pages re-fetch with new org scope
+        setCtxOrgId(data.activeOrgId || null)
       }
     } catch {
       // Silent fail — keep local state

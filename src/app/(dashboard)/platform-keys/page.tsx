@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { useOrgs } from '@/contexts/orgs-context'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -91,6 +92,7 @@ interface PlatformKey {
 }
 
 export default function PlatformKeysPage() {
+  const { activeOrgId } = useOrgs()
   const [keys, setKeys] = useState<PlatformKey[]>([])
   const [providerModels, setProviderModels] = useState<Record<string, string[]>>(FALLBACK_PROVIDER_MODELS)
   const [loading, setLoading] = useState(true)
@@ -149,6 +151,7 @@ export default function PlatformKeysPage() {
   }
 
   useEffect(() => {
+    setLoading(true)
     const controller = new AbortController()
     fetchKeys(controller.signal)
     fetch('/api/models')
@@ -164,7 +167,7 @@ export default function PlatformKeysPage() {
       })
       .catch(() => {})
     return () => controller.abort()
-  }, [])
+  }, [activeOrgId])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()

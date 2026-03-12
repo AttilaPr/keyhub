@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -98,6 +99,7 @@ interface SetupStatus {
 }
 
 export default function DocsPage() {
+  const { activeOrgId } = useOrgs()
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [activeProviders, setActiveProviders] = useState<Set<string>>(new Set())
   const [models, setModels] = useState(FALLBACK_MODELS)
@@ -143,7 +145,7 @@ export default function DocsPage() {
 
     loadData()
     return () => controller.abort()
-  }, [addToast])
+  }, [addToast, activeOrgId])
 
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {

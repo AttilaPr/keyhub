@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -261,6 +262,7 @@ function ProviderKeyCard({
 }
 
 export default function ProviderKeysPage() {
+  const { activeOrgId } = useOrgs()
   const [keys, setKeys] = useState<ProviderKey[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -291,10 +293,11 @@ export default function ProviderKeysPage() {
   }
 
   useEffect(() => {
+    setLoading(true)
     const controller = new AbortController()
     fetchKeys(controller.signal)
     return () => controller.abort()
-  }, [])
+  }, [activeOrgId])
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()

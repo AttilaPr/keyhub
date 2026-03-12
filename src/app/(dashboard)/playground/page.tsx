@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -96,6 +97,7 @@ function persistSessions(sessions: SavedSession[]) {
 }
 
 export default function PlaygroundPage() {
+  const { activeOrgId } = useOrgs()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [model, setModel] = useState('keyhub/free')
@@ -184,7 +186,7 @@ export default function PlaygroundPage() {
 
     loadInitialData()
     return () => controller.abort()
-  }, [])
+  }, [activeOrgId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

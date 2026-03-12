@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { useOrgs } from '@/contexts/orgs-context'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -90,6 +91,7 @@ interface PlatformKeyOption {
 }
 
 export default function LogsPage() {
+  const { activeOrgId } = useOrgs()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -161,7 +163,7 @@ export default function LogsPage() {
 
     loadFilterData()
     return () => controller.abort()
-  }, [addToast])
+  }, [addToast, activeOrgId])
 
   // Debounce search input
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -329,7 +331,7 @@ export default function LogsPage() {
     const controller = new AbortController()
     fetchLogs(controller.signal)
     return () => controller.abort()
-  }, [page, providerFilter, statusFilter, modelFilter, keyFilter, tagFilter, fromDate, toDate, searchQuery, sortBy, sortOrder])
+  }, [page, providerFilter, statusFilter, modelFilter, keyFilter, tagFilter, fromDate, toDate, searchQuery, sortBy, sortOrder, activeOrgId])
 
   const availableModels = providerFilter !== 'all'
     ? providerModels[providerFilter] || []
