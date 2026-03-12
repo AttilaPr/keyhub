@@ -226,6 +226,9 @@ model AnomalyEvent {
   detectedAt     DateTime  @default(now())
   acknowledgedAt DateTime?
 
+  orgId        String?
+  organization Organization? @relation(fields: [orgId], references: [id])
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, detectedAt])
@@ -306,11 +309,12 @@ model Organization {
   planId String?
   plan   Plan?   @relation(fields: [planId], references: [id])
 
-  members      OrganizationMember[]
-  invites      OrganizationInvite[]
-  providerKeys ProviderKey[]
-  platformKeys PlatformKey[]
-  requestLogs  RequestLog[]
+  members       OrganizationMember[]
+  invites       OrganizationInvite[]
+  providerKeys  ProviderKey[]
+  platformKeys  PlatformKey[]
+  requestLogs   RequestLog[]
+  anomalyEvents AnomalyEvent[]
 }
 
 model OrganizationMember {
