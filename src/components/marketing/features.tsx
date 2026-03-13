@@ -157,7 +157,7 @@ function FeatureSecurity() {
 
 export function FeaturesSection() {
   return (
-    <section className="py-24 md:py-32 border-t border-border/50">
+    <section id="features" className="py-24 md:py-32 border-t border-border/50">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
           Everything you need to manage AI APIs
