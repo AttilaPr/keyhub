@@ -1,7 +1,7 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
 import { useAnimatedIcon } from "@/hooks/use-animated-icon"
+import { useScrollAnimation } from "@/hooks/use-scroll-animation"
 import { WorkflowIcon } from "@/components/ui/workflow"
 import { DollarSignIcon } from "@/components/ui/dollar-sign"
 import { ShieldCheckIcon } from "@/components/ui/shield-check"
@@ -57,17 +57,39 @@ const features = [
 
 const featureByKey = Object.fromEntries(features.map((f) => [f.key, f]))
 
+function GlassCard({
+  children,
+  featured = false,
+  ...handlers
+}: {
+  children: React.ReactNode
+  featured?: boolean
+} & Record<string, unknown>) {
+  return (
+    <div
+      className={`rounded-xl p-6 backdrop-blur-sm transition-all duration-300 hover:bg-white/[0.08] ${
+        featured
+          ? "bg-lime-400/[0.06] border border-lime-400/15"
+          : "bg-white/[0.04] border border-white/[0.08]"
+      }`}
+      {...handlers}
+    >
+      {children}
+    </div>
+  )
+}
+
 function FeatureFree() {
   const { iconRef, handlers } = useAnimatedIcon()
   const f = featureByKey.free
   return (
-    <Card className="p-6 border-lime-400/20 bg-lime-400/5" {...handlers}>
+    <GlassCard featured {...handlers}>
       <div className="px-4">
         <SparklesIcon ref={iconRef} size={24} className="text-lime-400" />
-        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+        <h3 className="mt-4 text-base font-semibold text-white">{f.title}</h3>
+        <p className="mt-2 text-sm text-white/50">{f.description}</p>
       </div>
-    </Card>
+    </GlassCard>
   )
 }
 
@@ -75,13 +97,13 @@ function FeatureRouting() {
   const { iconRef, handlers } = useAnimatedIcon()
   const f = featureByKey.routing
   return (
-    <Card className="p-6" {...handlers}>
+    <GlassCard {...handlers}>
       <div className="px-4">
-        <WorkflowIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+        <WorkflowIcon ref={iconRef} size={24} className="text-white/70" />
+        <h3 className="mt-4 text-base font-semibold text-white">{f.title}</h3>
+        <p className="mt-2 text-sm text-white/50">{f.description}</p>
       </div>
-    </Card>
+    </GlassCard>
   )
 }
 
@@ -89,13 +111,13 @@ function FeatureCost() {
   const { iconRef, handlers } = useAnimatedIcon()
   const f = featureByKey.cost
   return (
-    <Card className="p-6" {...handlers}>
+    <GlassCard {...handlers}>
       <div className="px-4">
-        <DollarSignIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+        <DollarSignIcon ref={iconRef} size={24} className="text-white/70" />
+        <h3 className="mt-4 text-base font-semibold text-white">{f.title}</h3>
+        <p className="mt-2 text-sm text-white/50">{f.description}</p>
       </div>
-    </Card>
+    </GlassCard>
   )
 }
 
@@ -103,13 +125,13 @@ function FeatureKeys() {
   const { iconRef, handlers } = useAnimatedIcon()
   const f = featureByKey.keys
   return (
-    <Card className="p-6" {...handlers}>
+    <GlassCard {...handlers}>
       <div className="px-4">
-        <ShieldCheckIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+        <ShieldCheckIcon ref={iconRef} size={24} className="text-white/70" />
+        <h3 className="mt-4 text-base font-semibold text-white">{f.title}</h3>
+        <p className="mt-2 text-sm text-white/50">{f.description}</p>
       </div>
-    </Card>
+    </GlassCard>
   )
 }
 
@@ -117,13 +139,13 @@ function FeatureAnalytics() {
   const { iconRef, handlers } = useAnimatedIcon()
   const f = featureByKey.analytics
   return (
-    <Card className="p-6" {...handlers}>
+    <GlassCard {...handlers}>
       <div className="px-4">
-        <ChartColumnIncreasingIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+        <ChartColumnIncreasingIcon ref={iconRef} size={24} className="text-white/70" />
+        <h3 className="mt-4 text-base font-semibold text-white">{f.title}</h3>
+        <p className="mt-2 text-sm text-white/50">{f.description}</p>
       </div>
-    </Card>
+    </GlassCard>
   )
 }
 
@@ -131,13 +153,13 @@ function FeatureLoadBalancing() {
   const { iconRef, handlers } = useAnimatedIcon()
   const f = featureByKey.loadbalancing
   return (
-    <Card className="p-6" {...handlers}>
+    <GlassCard {...handlers}>
       <div className="px-4">
-        <LayersIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+        <LayersIcon ref={iconRef} size={24} className="text-white/70" />
+        <h3 className="mt-4 text-base font-semibold text-white">{f.title}</h3>
+        <p className="mt-2 text-sm text-white/50">{f.description}</p>
       </div>
-    </Card>
+    </GlassCard>
   )
 }
 
@@ -145,28 +167,33 @@ function FeatureSecurity() {
   const { iconRef, handlers } = useAnimatedIcon()
   const f = featureByKey.security
   return (
-    <Card className="p-6" {...handlers}>
+    <GlassCard {...handlers}>
       <div className="px-4">
-        <LockIcon ref={iconRef} size={24} />
-        <h3 className="mt-4 text-base font-semibold">{f.title}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+        <LockIcon ref={iconRef} size={24} className="text-white/70" />
+        <h3 className="mt-4 text-base font-semibold text-white">{f.title}</h3>
+        <p className="mt-2 text-sm text-white/50">{f.description}</p>
       </div>
-    </Card>
+    </GlassCard>
   )
 }
 
 export function FeaturesSection() {
+  const sectionRef = useScrollAnimation()
+
   return (
-    <section id="features" className="py-24 md:py-32 border-t border-border/50">
-      <div className="mx-auto max-w-6xl px-6 lg:px-8">
-        <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
+    <section id="features" className="relative py-32 md:py-40">
+      {/* Subtle radial glow behind grid */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-lime-400/[0.03] rounded-full blur-3xl pointer-events-none" />
+
+      <div ref={sectionRef} className="relative mx-auto max-w-6xl px-6 lg:px-8">
+        <h2 className="text-3xl font-bold tracking-tight md:text-4xl hero-gradient-text">
           Everything you need to manage AI APIs
         </h2>
-        <p className="mt-4 text-lg text-muted-foreground max-w-2xl">
+        <p className="mt-4 text-lg text-white/50 max-w-2xl">
           A complete toolkit for routing, monitoring, and controlling your AI
           provider integrations.
         </p>
-        <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <FeatureFree />
           <FeatureRouting />
           <FeatureCost />

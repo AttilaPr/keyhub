@@ -6,7 +6,7 @@ export default function MarketingLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-svh flex flex-col" style={{ fontFamily: "'General Sans', sans-serif" }}>
+    <div className="min-h-svh flex flex-col bg-black" style={{ fontFamily: "'General Sans', sans-serif" }}>
       {/* General Sans from Fontshare */}
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link
